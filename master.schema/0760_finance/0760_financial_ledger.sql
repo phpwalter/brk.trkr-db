@@ -9,6 +9,8 @@
                  identity.users
                  marketplace.orders
                  app.money_amount
+                 app.idempotency_key
+                 app.sha256_digest
  Creates:        finance.account_kind
                  finance.accounts
                  finance.transactions
@@ -16,7 +18,7 @@
 ===============================================================================
 */
 \set ON_ERROR_STOP on
-SELECT pg_temp.bt_preflight('0760_finance/0760_financial_ledger.sql', ARRAY['identity.owners', 'identity.users', 'marketplace.orders', 'app.money_amount']::text[]);
+SELECT pg_temp.bt_preflight('0760_finance/0760_financial_ledger.sql', ARRAY['identity.owners', 'identity.users', 'marketplace.orders', 'app.money_amount', 'app.idempotency_key', 'app.sha256_digest']::text[]);
 
 
 
@@ -37,7 +39,9 @@ CREATE TABLE finance.accounts (
 
 CREATE TABLE finance.transactions (
     financial_transaction_id uuid PRIMARY KEY DEFAULT app.uuid_v7(),
-    idempotency_key text NOT NULL UNIQUE,
+    idempotency_key app.idempotency_key NOT NULL UNIQUE,
+    request_hash app.sha256_digest NOT NULL,
+    financial_source_event_id uuid,
     order_id uuid REFERENCES marketplace.orders(order_id) ON DELETE RESTRICT,
     description text NOT NULL,
     currency app.currency_code NOT NULL,

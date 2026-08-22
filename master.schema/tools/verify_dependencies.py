@@ -33,6 +33,7 @@ def main():
         p.relative_to(ROOT).as_posix()
         for p in ROOT.rglob("*.sql")
         if p.name != "bootstrap.sql"
+        and "migrations" not in p.relative_to(ROOT).parts
     )
     errors=[]
     if set(disk) != set(unique):
@@ -45,6 +46,41 @@ def main():
     # that generated copy too; otherwise headers/JSON/file preflights can agree
     # while the installation-time gate is stale.
     helper_text=(ROOT/"0000_bootstrap/0000_dependency_preflight.sql").read_text()
+    # Bootstrap helper integrity: these temp functions are required before any
+    # subsequent SQL file can execute its generated preflight.
+    required_helpers = [
+        "CREATE OR REPLACE FUNCTION pg_temp.bt_dependency_exists",
+        "CREATE OR REPLACE FUNCTION pg_temp.bt_preflight",
+        "CREATE OR REPLACE FUNCTION pg_temp.bt_mark_completed",
+    ]
+    helper_positions = {}
+    for signature in required_helpers:
+        pos = helper_text.find(signature)
+        helper_positions[signature] = pos
+        if pos < 0:
+            errors.append(
+                "runtime preflight helper is incomplete: missing " + signature
+            )
+
+    if all(helper_positions[s] >= 0 for s in required_helpers):
+        if not (
+            helper_positions[required_helpers[0]]
+            < helper_positions[required_helpers[1]]
+            < helper_positions[required_helpers[2]]
+        ):
+            errors.append(
+                "runtime preflight helper function order is invalid: "
+                "bt_dependency_exists must precede bt_preflight, which must "
+                "precede bt_mark_completed"
+            )
+
+    # bt_preflight must actually invoke bt_dependency_exists; presence alone is
+    # not enough because a generated/helper refactor could orphan the check.
+    if "pg_temp.bt_dependency_exists(v_dep)" not in helper_text:
+        errors.append(
+            "runtime preflight helper is invalid: bt_preflight does not call "
+            "pg_temp.bt_dependency_exists(v_dep)"
+        )
     helper_rows={}
     row_re=re.compile(
         r"\((\d+),\s*'([^']+)',\s*ARRAY\[(.*?)\]::text\[\]\)",

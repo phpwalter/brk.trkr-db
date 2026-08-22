@@ -1,0 +1,6 @@
+{
+  "format_version": 1,
+  "baseline_id": "master-schema-v10.0",
+  "runner_version": "bricktrackr-migrator/1",
+  "migrations": []
+}

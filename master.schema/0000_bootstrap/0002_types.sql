@@ -11,6 +11,7 @@
                  app.whole_quantity
                  app.nonnegative_quantity
                  app.money_amount
+                 app.idempotency_key
                  app.sha256_digest
  Key Rules:      Money values use NUMERIC rather than floating-point types.
                  Piece quantities use integral values where appropriate.
@@ -93,6 +94,21 @@ COMMENT ON DOMAIN app.money_amount IS
 
 
 /* -------------------------------------------------------------------------- */
+/* Idempotency                                                                */
+/* -------------------------------------------------------------------------- */
+
+CREATE DOMAIN app.idempotency_key AS text
+    CONSTRAINT ck_idempotency_key_format
+    CHECK (
+        VALUE = btrim(VALUE)
+        AND char_length(VALUE) BETWEEN 8 AND 200
+    );
+
+COMMENT ON DOMAIN app.idempotency_key IS
+    'Stable client/request idempotency key. Keys are trimmed and 8-200 characters.';
+
+
+/* -------------------------------------------------------------------------- */
 /* Cryptographic digests                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -120,6 +136,7 @@ BEGIN
         'app.whole_quantity',
         'app.nonnegative_quantity',
         'app.money_amount',
+        'app.idempotency_key',
         'app.sha256_digest'
     ]
     LOOP

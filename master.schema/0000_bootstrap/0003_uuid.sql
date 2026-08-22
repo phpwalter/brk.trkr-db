@@ -27,6 +27,7 @@ RETURNS uuid
 LANGUAGE plpgsql
 VOLATILE
 PARALLEL UNSAFE
+SET search_path = pg_catalog
 AS $$
 DECLARE
     v_unix_ms bigint;
@@ -42,7 +43,7 @@ BEGIN
         right(lpad(to_hex(v_unix_ms), 12, '0'), 12);
 
     v_random_hex :=
-        encode(gen_random_bytes(10), 'hex');
+        encode(public.gen_random_bytes(10), 'hex');
 
     v_variant_nibble :=
         substr(

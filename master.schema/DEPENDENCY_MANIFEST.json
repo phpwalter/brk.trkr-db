@@ -1,0 +1,1197 @@
+{
+  "schema_version": "1.1.0",
+  "files": [
+    {
+      "ordinal": 1,
+      "file": "0000_bootstrap/0000_dependency_preflight.sql",
+      "depends_on": [
+        "PostgreSQL 16+"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "file": "0000_bootstrap/0000_extensions.sql",
+      "depends_on": [
+        "PostgreSQL extension installation privileges"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "file": "0000_bootstrap/0001_schemas.sql",
+      "depends_on": [
+        "0000_bootstrap/0000_extensions.sql"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "file": "0000_bootstrap/0002_types.sql",
+      "depends_on": [
+        "app schema"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "file": "0000_bootstrap/0003_uuid.sql",
+      "depends_on": [
+        "app schema",
+        "pgcrypto"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "file": "0000_bootstrap/0004_validation_helpers.sql",
+      "depends_on": [
+        "app schema"
+      ]
+    },
+    {
+      "ordinal": 7,
+      "file": "0000_bootstrap/0005_migration_framework.sql",
+      "depends_on": [
+        "0000_bootstrap/0004_validation_helpers.sql",
+        "app schema"
+      ]
+    },
+    {
+      "ordinal": 8,
+      "file": "1200_validation/1200_bootstrap_validation.sql",
+      "depends_on": [
+        "0000_bootstrap/0000_extensions.sql",
+        "0000_bootstrap/0001_schemas.sql",
+        "0000_bootstrap/0002_types.sql",
+        "0000_bootstrap/0003_uuid.sql",
+        "0000_bootstrap/0004_validation_helpers.sql",
+        "0000_bootstrap/0005_migration_framework.sql"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "file": "0100_identity/0100_users.sql",
+      "depends_on": [
+        "app.uuid_v7()",
+        "citext"
+      ]
+    },
+    {
+      "ordinal": 10,
+      "file": "0100_identity/0101_authentication.sql",
+      "depends_on": [
+        "identity.users",
+        "app.sha256_digest"
+      ]
+    },
+    {
+      "ordinal": 11,
+      "file": "0100_identity/0102_families.sql",
+      "depends_on": [
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 12,
+      "file": "0100_identity/0103_family_memberships.sql",
+      "depends_on": [
+        "identity.users",
+        "identity.families"
+      ]
+    },
+    {
+      "ordinal": 13,
+      "file": "0100_identity/0104_family_permissions.sql",
+      "depends_on": [
+        "identity.users",
+        "identity.families",
+        "identity.family_memberships"
+      ]
+    },
+    {
+      "ordinal": 14,
+      "file": "0100_identity/0105_guardianships.sql",
+      "depends_on": [
+        "identity.users",
+        "identity.families"
+      ]
+    },
+    {
+      "ordinal": 15,
+      "file": "0100_identity/0106_owners.sql",
+      "depends_on": [
+        "app.uuid_v7()",
+        "identity.users",
+        "identity.families"
+      ]
+    },
+    {
+      "ordinal": 16,
+      "file": "1200_validation/1201_identity_validation.sql",
+      "depends_on": [
+        "Complete 0100_identity domain"
+      ]
+    },
+    {
+      "ordinal": 17,
+      "file": "0200_reference/0200_external_sources.sql",
+      "depends_on": [
+        "reference schema"
+      ]
+    },
+    {
+      "ordinal": 18,
+      "file": "0200_reference/0201_colors.sql",
+      "depends_on": [
+        "reference.external_sources"
+      ]
+    },
+    {
+      "ordinal": 19,
+      "file": "0200_reference/0202_themes.sql",
+      "depends_on": [
+        "reference.external_sources"
+      ]
+    },
+    {
+      "ordinal": 20,
+      "file": "0200_reference/0203_categories.sql",
+      "depends_on": [
+        "reference.external_sources"
+      ]
+    },
+    {
+      "ordinal": 21,
+      "file": "0200_reference/0204_minifig_roles.sql",
+      "depends_on": [
+        "reference schema"
+      ]
+    },
+    {
+      "ordinal": 22,
+      "file": "1200_validation/1202_reference_validation.sql",
+      "depends_on": [
+        "0200_reference/0200_external_sources.sql",
+        "0200_reference/0201_colors.sql",
+        "0200_reference/0202_themes.sql",
+        "0200_reference/0203_categories.sql",
+        "0200_reference/0204_minifig_roles.sql"
+      ]
+    },
+    {
+      "ordinal": 23,
+      "file": "0300_catalog/0300_catalog_items.sql",
+      "depends_on": [
+        "identity.owners"
+      ]
+    },
+    {
+      "ordinal": 24,
+      "file": "0300_catalog/0301_catalog_sets.sql",
+      "depends_on": [
+        "catalog.items",
+        "reference.themes"
+      ]
+    },
+    {
+      "ordinal": 25,
+      "file": "0300_catalog/0302_catalog_parts.sql",
+      "depends_on": [
+        "catalog.items",
+        "reference.categories"
+      ]
+    },
+    {
+      "ordinal": 26,
+      "file": "0300_catalog/0303_catalog_minifigures.sql",
+      "depends_on": [
+        "catalog.items",
+        "reference.themes"
+      ]
+    },
+    {
+      "ordinal": 27,
+      "file": "0300_catalog/0304_catalog_books.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 28,
+      "file": "0300_catalog/0305_catalog_mocs.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 29,
+      "file": "0300_catalog/0306_catalog_sticker_sheets.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 30,
+      "file": "0300_catalog/0307_catalog_instructions.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 31,
+      "file": "0300_catalog/0308_catalog_packaging.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 32,
+      "file": "0300_catalog/0309_catalog_gear.sql",
+      "depends_on": [
+        "catalog.items",
+        "reference.categories"
+      ]
+    },
+    {
+      "ordinal": 33,
+      "file": "0300_catalog/0310_catalog_accessories.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 34,
+      "file": "0300_catalog/0311_catalog_polybags.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 35,
+      "file": "0300_catalog/0312_catalog_promotional_items.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 36,
+      "file": "0300_catalog/0313_catalog_publications.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 37,
+      "file": "0300_catalog/0314_catalog_other.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 38,
+      "file": "0300_catalog/0315_part_variants.sql",
+      "depends_on": [
+        "catalog.parts",
+        "reference.colors"
+      ]
+    },
+    {
+      "ordinal": 39,
+      "file": "0300_catalog/0316_lego_elements.sql",
+      "depends_on": [
+        "catalog.part_variants"
+      ]
+    },
+    {
+      "ordinal": 40,
+      "file": "0300_catalog/0317_external_identifiers.sql",
+      "depends_on": [
+        "reference.external_sources",
+        "catalog.items",
+        "catalog.part_variants"
+      ]
+    },
+    {
+      "ordinal": 41,
+      "file": "0300_catalog/0318_catalog_authority.sql",
+      "depends_on": [
+        "catalog.items",
+        "reference.external_sources",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 42,
+      "file": "0300_catalog/0319_part_tooling.sql",
+      "depends_on": [
+        "catalog.parts",
+        "catalog.part_variants",
+        "reference.external_sources"
+      ]
+    },
+    {
+      "ordinal": 43,
+      "file": "0300_catalog/0320_catalog_search_media.sql",
+      "depends_on": [
+        "catalog.items",
+        "reference.external_sources",
+        "pg_trgm"
+      ]
+    },
+    {
+      "ordinal": 44,
+      "file": "1200_validation/1203_catalog_validation.sql",
+      "depends_on": [
+        "Complete 0300_catalog domain"
+      ]
+    },
+    {
+      "ordinal": 45,
+      "file": "0400_definitions/0400_inventory_definitions.sql",
+      "depends_on": [
+        "catalog.items"
+      ]
+    },
+    {
+      "ordinal": 46,
+      "file": "0400_definitions/0401_inventory_versions.sql",
+      "depends_on": [
+        "definition.inventory_definitions",
+        "reference.external_sources",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 47,
+      "file": "0400_definitions/0402_requirement_groups.sql",
+      "depends_on": [
+        "definition.inventory_versions"
+      ]
+    },
+    {
+      "ordinal": 48,
+      "file": "0400_definitions/0403_requirement_options.sql",
+      "depends_on": [
+        "definition.requirement_groups",
+        "catalog.items",
+        "catalog.part_variants",
+        "reference.minifig_roles"
+      ]
+    },
+    {
+      "ordinal": 49,
+      "file": "0400_definitions/0404_definition_authority.sql",
+      "depends_on": [
+        "definition.inventory_definitions",
+        "definition.inventory_versions"
+      ]
+    },
+    {
+      "ordinal": 50,
+      "file": "0400_definitions/0405_manifest_graph.sql",
+      "depends_on": [
+        "definition.inventory_versions",
+        "definition.requirement_groups"
+      ]
+    },
+    {
+      "ordinal": 51,
+      "file": "0400_definitions/0406_minifig_compositions.sql",
+      "depends_on": [
+        "definition.inventory_versions",
+        "catalog.part_variants",
+        "catalog.decorated_variants",
+        "reference.minifig_roles"
+      ]
+    },
+    {
+      "ordinal": 52,
+      "file": "1200_validation/1204_definition_validation.sql",
+      "depends_on": [
+        "0400_definitions/0400_inventory_definitions.sql",
+        "0400_definitions/0401_inventory_versions.sql",
+        "0400_definitions/0402_requirement_groups.sql",
+        "0400_definitions/0403_requirement_options.sql",
+        "0400_definitions/0404_definition_authority.sql"
+      ]
+    },
+    {
+      "ordinal": 53,
+      "file": "0500_collections/0500_storage_locations.sql",
+      "depends_on": [
+        "identity.owners"
+      ]
+    },
+    {
+      "ordinal": 54,
+      "file": "0500_collections/0501_collection_entries.sql",
+      "depends_on": [
+        "identity.owners",
+        "catalog.items",
+        "catalog.part_variants"
+      ]
+    },
+    {
+      "ordinal": 55,
+      "file": "0500_collections/0502_collection_instances.sql",
+      "depends_on": [
+        "collection.entries",
+        "definition.inventory_versions"
+      ]
+    },
+    {
+      "ordinal": 56,
+      "file": "0500_collections/0503_instance_adjustments.sql",
+      "depends_on": [
+        "collection.instances",
+        "definition.requirement_groups",
+        "catalog.items",
+        "catalog.part_variants"
+      ]
+    },
+    {
+      "ordinal": 57,
+      "file": "0500_collections/0504_storage_allocations.sql",
+      "depends_on": [
+        "collection.entries",
+        "collection.instances",
+        "collection.storage_locations"
+      ]
+    },
+    {
+      "ordinal": 58,
+      "file": "0500_collections/0505_transfers.sql",
+      "depends_on": [
+        "collection.entries",
+        "identity.owners",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 59,
+      "file": "0500_collections/0506_acquisitions.sql",
+      "depends_on": [
+        "identity.owners",
+        "collection.entries",
+        "collection.instances",
+        "app.currency_code",
+        "app.money_amount"
+      ]
+    },
+    {
+      "ordinal": 60,
+      "file": "0500_collections/0507_tags.sql",
+      "depends_on": [
+        "identity.owners",
+        "collection.entries",
+        "citext"
+      ]
+    },
+    {
+      "ordinal": 61,
+      "file": "1200_validation/1205_collection_validation.sql",
+      "depends_on": [
+        "Complete 0500_collections domain"
+      ]
+    },
+    {
+      "ordinal": 62,
+      "file": "0600_wanted/0600_wishlists.sql",
+      "depends_on": [
+        "identity.owners"
+      ]
+    },
+    {
+      "ordinal": 63,
+      "file": "0600_wanted/0601_wishlist_entries.sql",
+      "depends_on": [
+        "wanted.wishlists",
+        "catalog.items",
+        "catalog.part_variants",
+        "definition.inventory_versions"
+      ]
+    },
+    {
+      "ordinal": 64,
+      "file": "0600_wanted/0602_wishlist_reservations.sql",
+      "depends_on": [
+        "wanted.wishlist_entries",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 65,
+      "file": "0600_wanted/0603_build_goals.sql",
+      "depends_on": [
+        "identity.owners",
+        "catalog.items",
+        "definition.inventory_versions",
+        "collection.instances"
+      ]
+    },
+    {
+      "ordinal": 66,
+      "file": "0600_wanted/0604_build_allocations.sql",
+      "depends_on": [
+        "wanted.build_goals",
+        "collection.entries",
+        "definition.requirement_groups"
+      ]
+    },
+    {
+      "ordinal": 67,
+      "file": "1200_validation/1206_wanted_validation.sql",
+      "depends_on": [
+        "Complete 0600_wanted domain",
+        "collection.entries",
+        "collection.instances",
+        "definition.inventory_versions"
+      ]
+    },
+    {
+      "ordinal": 68,
+      "file": "0700_mocs/0700_mocs.sql",
+      "depends_on": [
+        "catalog.mocs",
+        "identity.owners",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 69,
+      "file": "0700_mocs/0701_moc_revisions.sql",
+      "depends_on": [
+        "moc.mocs",
+        "definition.inventory_versions",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 70,
+      "file": "0700_mocs/0702_moc_forks.sql",
+      "depends_on": [
+        "moc.mocs",
+        "moc.revisions",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 71,
+      "file": "0700_mocs/0703_moc_subassemblies.sql",
+      "depends_on": [
+        "moc.revisions"
+      ]
+    },
+    {
+      "ordinal": 72,
+      "file": "0700_mocs/0704_moc_licenses.sql",
+      "depends_on": [
+        "moc.revisions"
+      ]
+    },
+    {
+      "ordinal": 73,
+      "file": "0700_mocs/0705_moc_assets.sql",
+      "depends_on": [
+        "moc.revisions",
+        "app.sha256_digest"
+      ]
+    },
+    {
+      "ordinal": 74,
+      "file": "1200_validation/1207_moc_validation.sql",
+      "depends_on": [
+        "Complete 0700_mocs domain",
+        "catalog.mocs",
+        "definition.inventory_versions"
+      ]
+    },
+    {
+      "ordinal": 75,
+      "file": "0750_marketplace/0750_market_prices.sql",
+      "depends_on": [
+        "catalog.items",
+        "catalog.part_variants",
+        "reference.external_sources",
+        "app.money_amount"
+      ]
+    },
+    {
+      "ordinal": 76,
+      "file": "0750_marketplace/0751_marketplace.sql",
+      "depends_on": [
+        "identity.owners",
+        "identity.users",
+        "collection.entries",
+        "marketplace.market_price_observations"
+      ]
+    },
+    {
+      "ordinal": 77,
+      "file": "0760_finance/0760_financial_ledger.sql",
+      "depends_on": [
+        "identity.owners",
+        "identity.users",
+        "marketplace.orders",
+        "app.money_amount",
+        "app.idempotency_key",
+        "app.sha256_digest"
+      ]
+    },
+    {
+      "ordinal": 78,
+      "file": "0760_finance/0761_financial_readiness_anchors.sql",
+      "depends_on": [
+        "0760_finance/0760_financial_ledger.sql",
+        "pgcrypto",
+        "app.idempotency_key",
+        "app.sha256_digest"
+      ]
+    },
+    {
+      "ordinal": 79,
+      "file": "0800_imports/0800_import_jobs.sql",
+      "depends_on": [
+        "reference.external_sources",
+        "identity.owners",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 80,
+      "file": "0800_imports/0801_source_runs.sql",
+      "depends_on": [
+        "reference.external_sources"
+      ]
+    },
+    {
+      "ordinal": 81,
+      "file": "0800_imports/0802_raw_staging.sql",
+      "depends_on": [
+        "import.jobs",
+        "import.source_runs"
+      ]
+    },
+    {
+      "ordinal": 82,
+      "file": "0800_imports/0803_source_run_datasets.sql",
+      "depends_on": [
+        "import.source_runs"
+      ]
+    },
+    {
+      "ordinal": 83,
+      "file": "0800_imports/0804_normalized_records.sql",
+      "depends_on": [
+        "import.jobs",
+        "import.raw_records"
+      ]
+    },
+    {
+      "ordinal": 84,
+      "file": "0800_imports/0805_import_matches.sql",
+      "depends_on": [
+        "import.normalized_records",
+        "catalog.items",
+        "catalog.part_variants",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 85,
+      "file": "0800_imports/0806_user_mapping_suggestions.sql",
+      "depends_on": [
+        "identity.users",
+        "reference.external_sources",
+        "catalog.items",
+        "catalog.part_variants"
+      ]
+    },
+    {
+      "ordinal": 86,
+      "file": "0800_imports/0807_import_applications.sql",
+      "depends_on": [
+        "import.jobs",
+        "identity.users"
+      ]
+    },
+    {
+      "ordinal": 87,
+      "file": "1200_validation/1208_import_validation.sql",
+      "depends_on": [
+        "Complete 0800_imports domain",
+        "reference.external_sources",
+        "catalog"
+      ]
+    },
+    {
+      "ordinal": 88,
+      "file": "0850_operations/0850_jobs_notifications.sql",
+      "depends_on": [
+        "identity.users",
+        "identity.owners"
+      ]
+    },
+    {
+      "ordinal": 89,
+      "file": "0900_audit/0900_audit_events.sql",
+      "depends_on": [
+        "identity.users",
+        "identity.owners",
+        "import.jobs",
+        "import.source_runs"
+      ]
+    },
+    {
+      "ordinal": 90,
+      "file": "0900_audit/0901_audit_changes.sql",
+      "depends_on": [
+        "audit.events"
+      ]
+    },
+    {
+      "ordinal": 91,
+      "file": "1200_validation/1209_audit_validation.sql",
+      "depends_on": [
+        "0900_audit/0900_audit_events.sql",
+        "0900_audit/0901_audit_changes.sql"
+      ]
+    },
+    {
+      "ordinal": 92,
+      "file": "1000_function/1000_identity_function.sql",
+      "depends_on": [
+        "identity.users",
+        "identity.families",
+        "identity.family_memberships",
+        "identity.family_member_permissions",
+        "identity.guardianships",
+        "identity.owners"
+      ]
+    },
+    {
+      "ordinal": 93,
+      "file": "1000_function/1001_hierarchy_function.sql",
+      "depends_on": [
+        "reference.themes",
+        "reference.categories",
+        "collection.storage_locations",
+        "moc.subassemblies"
+      ]
+    },
+    {
+      "ordinal": 94,
+      "file": "1000_function/1002_catalog_function.sql",
+      "depends_on": [
+        "Complete 0300_catalog domain"
+      ]
+    },
+    {
+      "ordinal": 95,
+      "file": "1000_function/1003_definition_function.sql",
+      "depends_on": [
+        "definition.inventory_definitions",
+        "definition.inventory_versions",
+        "definition.requirement_groups",
+        "definition.requirement_options",
+        "definition.definition_authority"
+      ]
+    },
+    {
+      "ordinal": 96,
+      "file": "1000_function/1004_collection_function.sql",
+      "depends_on": [
+        "collection.entries",
+        "collection.instances",
+        "collection.storage_locations",
+        "collection.storage_allocations",
+        "wanted.build_allocations"
+      ]
+    },
+    {
+      "ordinal": 97,
+      "file": "1000_function/1005_wanted_function.sql",
+      "depends_on": [
+        "wanted.build_goals",
+        "definition.requirement_groups",
+        "definition.requirement_options",
+        "collection.explicit_part_balance()"
+      ]
+    },
+    {
+      "ordinal": 98,
+      "file": "1000_function/1006_moc_function.sql",
+      "depends_on": [
+        "moc.mocs",
+        "moc.revisions",
+        "moc.forks"
+      ]
+    },
+    {
+      "ordinal": 99,
+      "file": "1000_function/1007_import_function.sql",
+      "depends_on": [
+        "import.source_runs",
+        "import.source_run_datasets",
+        "import.source_stage_records",
+        "catalog.source_values",
+        "catalog.source_value_history",
+        "definition.inventory_versions",
+        "reference.external_sources"
+      ]
+    },
+    {
+      "ordinal": 100,
+      "file": "1000_function/1008_audit_function.sql",
+      "depends_on": [
+        "audit.events",
+        "audit.changes",
+        "identity.current_user_id()",
+        "Complete 0500_collections domain",
+        "Complete 0600_wanted domain",
+        "Complete 0700_mocs domain",
+        "Complete 0800_imports domain"
+      ]
+    },
+    {
+      "ordinal": 101,
+      "file": "1000_function/1009_integrity_hardening.sql",
+      "depends_on": [
+        "identity.users",
+        "identity.families",
+        "identity.guardianships",
+        "reference.themes",
+        "reference.categories",
+        "collection.storage_locations",
+        "collection.entries",
+        "collection.instances",
+        "collection.storage_allocations",
+        "collection.acquisition_items",
+        "wanted.wishlist_entries",
+        "wanted.build_goals",
+        "wanted.build_allocations",
+        "moc.revisions",
+        "moc.subassemblies",
+        "moc.forks",
+        "import.normalized_records",
+        "definition.definition_authority"
+      ]
+    },
+    {
+      "ordinal": 102,
+      "file": "1000_function/1010_moc_access_function.sql",
+      "depends_on": [
+        "api schema",
+        "moc.mocs",
+        "moc.revisions",
+        "moc.assets",
+        "moc.licenses",
+        "moc.subassemblies",
+        "identity.current_user_id()"
+      ]
+    },
+    {
+      "ordinal": 103,
+      "file": "1000_function/1011_request_context.sql",
+      "depends_on": [
+        "app schema",
+        "identity.current_user_id()",
+        "audit.events"
+      ]
+    },
+    {
+      "ordinal": 104,
+      "file": "1000_function/1012_graph_function.sql",
+      "depends_on": [
+        "definition.manifest_subassemblies"
+      ]
+    },
+    {
+      "ordinal": 105,
+      "file": "1000_function/1013_operational_api.sql",
+      "depends_on": [
+        "catalog.item_search",
+        "catalog.items",
+        "catalog.item_images",
+        "catalog.instruction_assets",
+        "operations.notifications",
+        "collection.transfers",
+        "collection.entries",
+        "collection.storage_allocations",
+        "collection.entry_tags",
+        "wanted.build_allocations",
+        "identity.current_user_id()",
+        "identity.can_manage_owner()"
+      ]
+    },
+    {
+      "ordinal": 106,
+      "file": "1000_function/1014_finance_function.sql",
+      "depends_on": [
+        "finance.accounts",
+        "finance.transactions",
+        "finance.ledger_entries",
+        "finance.source_events",
+        "pgcrypto"
+      ]
+    },
+    {
+      "ordinal": 107,
+      "file": "1200_validation/1210_function_validation.sql",
+      "depends_on": [
+        "Complete 1000_function domain"
+      ]
+    },
+    {
+      "ordinal": 108,
+      "file": "1050_reporting/1050_reporting_views.sql",
+      "depends_on": [
+        "catalog.items",
+        "collection.entries",
+        "collection.instances",
+        "wanted.wishlist_entries",
+        "moc.mocs",
+        "moc.revisions",
+        "import.jobs",
+        "marketplace.listings",
+        "marketplace.orders",
+        "finance.transactions",
+        "operations.notifications"
+      ]
+    },
+    {
+      "ordinal": 109,
+      "file": "1100_security/1100_roles.sql",
+      "depends_on": [
+        "PostgreSQL role-creation privileges"
+      ]
+    },
+    {
+      "ordinal": 110,
+      "file": "1100_security/1101_rls_identity.sql",
+      "depends_on": [
+        "identity.user_credentials",
+        "identity.user_sessions",
+        "identity.one_time_tokens",
+        "identity.current_user_id()",
+        "identity.can_manage_user()"
+      ]
+    },
+    {
+      "ordinal": 111,
+      "file": "1100_security/1102_rls_collections.sql",
+      "depends_on": [
+        "Complete 0500_collections domain",
+        "identity.current_user_id()",
+        "identity.can_view_owner()",
+        "identity.can_manage_owner()"
+      ]
+    },
+    {
+      "ordinal": 112,
+      "file": "1100_security/1103_rls_wanted.sql",
+      "depends_on": [
+        "Complete 0600_wanted domain",
+        "identity.current_user_id()",
+        "identity.can_view_owner()",
+        "identity.can_manage_owner()"
+      ]
+    },
+    {
+      "ordinal": 113,
+      "file": "1100_security/1104_rls_mocs.sql",
+      "depends_on": [
+        "Complete 0700_mocs domain",
+        "identity.current_user_id()",
+        "identity.can_view_owner()",
+        "identity.can_manage_owner()"
+      ]
+    },
+    {
+      "ordinal": 114,
+      "file": "1100_security/1105_rls_imports.sql",
+      "depends_on": [
+        "Complete 0800_imports domain",
+        "identity.current_user_id()",
+        "identity.can_view_owner()",
+        "identity.can_manage_owner()"
+      ]
+    },
+    {
+      "ordinal": 115,
+      "file": "1100_security/1106_rls_audit.sql",
+      "depends_on": [
+        "1100_security/1100_roles.sql",
+        "audit.events",
+        "audit.changes"
+      ]
+    },
+    {
+      "ordinal": 116,
+      "file": "1100_security/1108_rls_catalog_definition.sql",
+      "depends_on": [
+        "Complete 0300_catalog domain",
+        "Complete 0400_definitions domain",
+        "identity.current_user_id()",
+        "identity.can_view_owner()"
+      ]
+    },
+    {
+      "ordinal": 117,
+      "file": "1100_security/1109_rls_extended.sql",
+      "depends_on": [
+        "marketplace.listings",
+        "marketplace.orders",
+        "operations.notifications",
+        "identity.current_user_id()",
+        "identity.can_view_owner()",
+        "identity.can_manage_owner()"
+      ]
+    },
+    {
+      "ordinal": 118,
+      "file": "1100_security/1107_grants.sql",
+      "depends_on": [
+        "1100_security/1100_roles.sql",
+        "1100_security/1101_rls_identity.sql",
+        "1100_security/1102_rls_collections.sql",
+        "1100_security/1103_rls_wanted.sql",
+        "1100_security/1104_rls_mocs.sql",
+        "1100_security/1105_rls_imports.sql",
+        "1100_security/1106_rls_audit.sql"
+      ]
+    },
+    {
+      "ordinal": 119,
+      "file": "1100_security/1110_api_surface_lockdown.sql",
+      "depends_on": [
+        "1100_security/1107_grants.sql",
+        "Complete 1000_function domain"
+      ]
+    },
+    {
+      "ordinal": 120,
+      "file": "1100_security/1111_role_ownership_separation.sql",
+      "depends_on": [
+        "1100_security/1100_roles.sql",
+        "1100_security/1110_api_surface_lockdown.sql"
+      ]
+    },
+    {
+      "ordinal": 121,
+      "file": "1200_validation/1211_security_validation.sql",
+      "depends_on": [
+        "Complete 1100_security domain"
+      ]
+    },
+    {
+      "ordinal": 122,
+      "file": "1200_validation/1212_integrity_validation.sql",
+      "depends_on": [
+        "1000_function/1009_integrity_hardening.sql",
+        "1100_security/1108_rls_catalog_definition.sql"
+      ]
+    },
+    {
+      "ordinal": 123,
+      "file": "1200_validation/1214_extended_architecture_validation.sql",
+      "depends_on": [
+        "catalog.part_molds",
+        "catalog.item_search",
+        "definition.manifest_subassemblies",
+        "definition.minifig_compositions",
+        "marketplace.listings",
+        "finance.transactions",
+        "operations.notifications",
+        "reporting.catalog_items",
+        "api.search_catalog()",
+        "admin.post_financial_transaction()",
+        "1100_security/1107_grants.sql"
+      ]
+    },
+    {
+      "ordinal": 124,
+      "file": "1200_validation/1215_security_contract_validation.sql",
+      "depends_on": [
+        "1100_security/1107_grants.sql",
+        "1100_security/1110_api_surface_lockdown.sql",
+        "Complete 1000_function domain"
+      ]
+    },
+    {
+      "ordinal": 125,
+      "file": "1200_validation/1216_adversarial_authorization_validation.sql",
+      "depends_on": [
+        "1200_validation/1215_security_contract_validation.sql",
+        "identity.current_user_id()",
+        "identity.can_manage_user()",
+        "identity.has_family_capability()",
+        "api.mark_notification_read(uuid)"
+      ]
+    },
+    {
+      "ordinal": 126,
+      "file": "1200_validation/1217_pgbouncer_transaction_context_validation.sql",
+      "depends_on": [
+        "1200_validation/1216_adversarial_authorization_validation.sql",
+        "app.set_authenticated_user(uuid)",
+        "app.set_request_context(uuid,text,text)",
+        "identity.current_user_id()",
+        "identity.current_user_id_optional()"
+      ]
+    },
+    {
+      "ordinal": 127,
+      "file": "1200_validation/1218_api_surface_validation.sql",
+      "depends_on": [
+        "1100_security/1110_api_surface_lockdown.sql",
+        "1200_validation/1217_pgbouncer_transaction_context_validation.sql"
+      ]
+    },
+    {
+      "ordinal": 128,
+      "file": "1200_validation/1219_migration_framework_validation.sql",
+      "depends_on": [
+        "0000_bootstrap/0005_migration_framework.sql",
+        "1100_security/1107_grants.sql"
+      ]
+    },
+    {
+      "ordinal": 129,
+      "file": "1200_validation/1220_financial_readiness_validation.sql",
+      "depends_on": [
+        "0760_finance/0761_financial_readiness_anchors.sql",
+        "1000_function/1014_finance_function.sql",
+        "1100_security/1107_grants.sql",
+        "1200_validation/1219_migration_framework_validation.sql"
+      ]
+    },
+    {
+      "ordinal": 130,
+      "file": "1200_validation/1221_operational_integrity_validation.sql",
+      "depends_on": [
+        "1200_validation/1220_financial_readiness_validation.sql"
+      ]
+    },
+    {
+      "ordinal": 131,
+      "file": "1200_validation/1222_role_separation_validation.sql",
+      "depends_on": [
+        "1100_security/1111_role_ownership_separation.sql",
+        "1200_validation/1221_operational_integrity_validation.sql"
+      ]
+    },
+    {
+      "ordinal": 132,
+      "file": "1200_validation/1213_dependency_validation.sql",
+      "depends_on": [
+        "1200_validation/1212_integrity_validation.sql",
+        "1200_validation/1214_extended_architecture_validation.sql",
+        "1200_validation/1215_security_contract_validation.sql",
+        "1200_validation/1216_adversarial_authorization_validation.sql",
+        "1200_validation/1217_pgbouncer_transaction_context_validation.sql",
+        "1200_validation/1218_api_surface_validation.sql",
+        "1200_validation/1219_migration_framework_validation.sql",
+        "1200_validation/1220_financial_readiness_validation.sql",
+        "1200_validation/1221_operational_integrity_validation.sql",
+        "1200_validation/1222_role_separation_validation.sql"
+      ]
+    }
+  ]
+}

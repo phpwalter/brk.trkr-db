@@ -12,6 +12,7 @@
  Creates:        app.current_request_id()
                  app.current_trace_id()
                  app.current_actor_class()
+                 app.set_authenticated_user(uuid)
                  app.set_request_context(...)
 ===============================================================================
 */
@@ -21,16 +22,57 @@ SELECT pg_temp.bt_preflight('1000_function/1011_request_context.sql', ARRAY['app
 
 
 CREATE OR REPLACE FUNCTION app.current_request_id()
-RETURNS uuid LANGUAGE sql STABLE
-AS $$ SELECT NULLIF(current_setting('app.request_id', true), '')::uuid $$;
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SET search_path = pg_catalog
+AS $$ SELECT NULLIF(pg_catalog.current_setting('app.request_id', true), '')::uuid $$;
 
 CREATE OR REPLACE FUNCTION app.current_trace_id()
-RETURNS text LANGUAGE sql STABLE
-AS $$ SELECT NULLIF(current_setting('app.trace_id', true), '') $$;
+RETURNS text
+LANGUAGE sql
+STABLE
+SET search_path = pg_catalog
+AS $$ SELECT NULLIF(pg_catalog.current_setting('app.trace_id', true), '') $$;
 
 CREATE OR REPLACE FUNCTION app.current_actor_class()
-RETURNS text LANGUAGE sql STABLE
-AS $$ SELECT COALESCE(NULLIF(current_setting('app.actor_class', true), ''), 'USER') $$;
+RETURNS text
+LANGUAGE sql
+STABLE
+SET search_path = pg_catalog
+AS $$ SELECT COALESCE(NULLIF(pg_catalog.current_setting('app.actor_class', true), ''), 'USER') $$;
+
+
+/*
+ * Canonical authenticated-user context setter.
+ *
+ * Middleware calls this only after BEGIN, using the internal database user UUID
+ * extracted from a cryptographically verified application access token. The
+ * TRUE argument makes the setting transaction-local, which is required for
+ * PgBouncer transaction pooling.
+ */
+CREATE OR REPLACE FUNCTION app.set_authenticated_user(
+    p_user_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog
+AS $$
+BEGIN
+    IF p_user_id IS NULL THEN
+        RAISE EXCEPTION 'Authenticated user id is required'
+            USING ERRCODE = '22004';
+    END IF;
+
+    PERFORM pg_catalog.set_config(
+        'app.current_user_id',
+        p_user_id::text,
+        true
+    );
+END;
+$$;
+
 
 CREATE OR REPLACE FUNCTION app.set_request_context(
     p_request_id uuid,
@@ -40,14 +82,28 @@ CREATE OR REPLACE FUNCTION app.set_request_context(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY INVOKER
+SET search_path = pg_catalog
 AS $$
 BEGIN
     IF p_actor_class NOT IN ('USER','ADMIN','IMPORTER','SYSTEM') THEN
         RAISE EXCEPTION 'Invalid actor class: %', p_actor_class USING ERRCODE='22023';
     END IF;
-    PERFORM set_config('app.request_id', COALESCE(p_request_id::text, ''), true);
-    PERFORM set_config('app.trace_id', COALESCE(p_trace_id, ''), true);
-    PERFORM set_config('app.actor_class', p_actor_class, true);
+
+    PERFORM pg_catalog.set_config(
+        'app.request_id',
+        COALESCE(p_request_id::text, ''),
+        true
+    );
+    PERFORM pg_catalog.set_config(
+        'app.trace_id',
+        COALESCE(p_trace_id, ''),
+        true
+    );
+    PERFORM pg_catalog.set_config(
+        'app.actor_class',
+        p_actor_class,
+        true
+    );
 END;
 $$;
 

@@ -21,7 +21,7 @@ SELECT pg_temp.bt_preflight('0000_bootstrap/0000_extensions.sql', ARRAY['Postgre
 
 
 
-CREATE EXTENSION pgcrypto;
+CREATE EXTENSION pgcrypto WITH SCHEMA public;
 CREATE EXTENSION citext;
 CREATE EXTENSION pg_trgm;
 
@@ -29,10 +29,14 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1
-        FROM pg_extension
-        WHERE extname = 'pgcrypto'
+        FROM pg_extension e
+        JOIN pg_namespace n
+          ON n.oid = e.extnamespace
+        WHERE e.extname = 'pgcrypto'
+          AND n.nspname = 'public'
     ) THEN
-        RAISE EXCEPTION 'Required extension "pgcrypto" is missing';
+        RAISE EXCEPTION
+            'Required extension "pgcrypto" must be installed in schema public';
     END IF;
 
     IF NOT EXISTS (

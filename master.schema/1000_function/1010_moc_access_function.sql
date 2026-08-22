@@ -37,7 +37,7 @@ AS $$
       AND (
           m.visibility IN ('PUBLIC', 'UNLISTED')
           OR identity.can_view_owner(
-              identity.current_user_id(),
+              identity.current_user_id_optional(),
               m.owner_id,
               'MOCS'
           )
@@ -66,7 +66,7 @@ AS $$
               AND r.status = 'PUBLISHED'
           )
           OR identity.can_view_owner(
-              identity.current_user_id(),
+              identity.current_user_id_optional(),
               m.owner_id,
               'MOCS'
           )
@@ -100,7 +100,7 @@ AS $$
               AND r.status = 'PUBLISHED'
           )
           OR identity.can_view_owner(
-              identity.current_user_id(),
+              identity.current_user_id_optional(),
               m.owner_id,
               'MOCS'
           )
@@ -134,7 +134,7 @@ AS $$
               AND r.status = 'PUBLISHED'
           )
           OR identity.can_view_owner(
-              identity.current_user_id(),
+              identity.current_user_id_optional(),
               m.owner_id,
               'MOCS'
           )
@@ -168,7 +168,7 @@ AS $$
               AND r.status = 'PUBLISHED'
           )
           OR identity.can_view_owner(
-              identity.current_user_id(),
+              identity.current_user_id_optional(),
               m.owner_id,
               'MOCS'
           )

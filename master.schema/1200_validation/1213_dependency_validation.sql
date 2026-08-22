@@ -8,11 +8,19 @@
                  dependency preflight before its executable body ran.
  Depends On:     1200_validation/1212_integrity_validation.sql
                  1200_validation/1214_extended_architecture_validation.sql
+                 1200_validation/1215_security_contract_validation.sql
+                 1200_validation/1216_adversarial_authorization_validation.sql
+                 1200_validation/1217_pgbouncer_transaction_context_validation.sql
+                 1200_validation/1218_api_surface_validation.sql
+                 1200_validation/1219_migration_framework_validation.sql
+                 1200_validation/1220_financial_readiness_validation.sql
+                 1200_validation/1221_operational_integrity_validation.sql
+                 1200_validation/1222_role_separation_validation.sql
  Creates:        Validation assertions only
 ===============================================================================
 */
 \set ON_ERROR_STOP on
-SELECT pg_temp.bt_preflight('1200_validation/1213_dependency_validation.sql', ARRAY['1200_validation/1212_integrity_validation.sql', '1200_validation/1214_extended_architecture_validation.sql']::text[]);
+SELECT pg_temp.bt_preflight('1200_validation/1213_dependency_validation.sql', ARRAY['1200_validation/1212_integrity_validation.sql', '1200_validation/1214_extended_architecture_validation.sql', '1200_validation/1215_security_contract_validation.sql', '1200_validation/1216_adversarial_authorization_validation.sql', '1200_validation/1217_pgbouncer_transaction_context_validation.sql', '1200_validation/1218_api_surface_validation.sql', '1200_validation/1219_migration_framework_validation.sql', '1200_validation/1220_financial_readiness_validation.sql', '1200_validation/1221_operational_integrity_validation.sql', '1200_validation/1222_role_separation_validation.sql']::text[]);
 
 
 

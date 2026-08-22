@@ -1,0 +1,17 @@
+/*
+===============================================================================
+ Migration ID:   000001
+ Name:           short_description
+ PostgreSQL:     16+
+ Transaction:    transactional
+ Purpose:        Describe exactly what this forward-only migration changes.
+ Preconditions:  Describe required prior schema state.
+ Postconditions: Describe the state guaranteed after success.
+ Rollback:       No down migration. Correct forward with a later migration.
+===============================================================================
+*/
+
+\set ON_ERROR_STOP on
+
+-- Migration SQL only.
+-- Do not add BEGIN / COMMIT / ROLLBACK; the runner owns the boundary.

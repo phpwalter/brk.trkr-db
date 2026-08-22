@@ -13,6 +13,7 @@
                  identity.guardianships
                  identity.owners
  Creates:        identity.current_user_id()
+                 identity.current_user_id_optional()
                  identity.ensure_owner_for_user()
                  identity.ensure_owner_for_family()
                  identity.has_family_capability()
@@ -41,14 +42,64 @@ SELECT pg_temp.bt_preflight('1000_function/1000_identity_function.sql', ARRAY['i
 
 CREATE FUNCTION identity.current_user_id()
 RETURNS uuid
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 PARALLEL SAFE
+SET search_path = pg_catalog
 AS $$
-    SELECT nullif(
-        current_setting('app.current_user_id', true),
-        ''
-    )::uuid;
+DECLARE
+    v_raw text;
+BEGIN
+    v_raw := NULLIF(pg_catalog.current_setting('app.current_user_id', true), '');
+
+    IF v_raw IS NULL THEN
+        RAISE EXCEPTION 'Authenticated database user context is not established'
+            USING ERRCODE = '28000';
+    END IF;
+
+    BEGIN
+        RETURN v_raw::uuid;
+    EXCEPTION
+        WHEN invalid_text_representation THEN
+            RAISE EXCEPTION 'Authenticated database user context is invalid'
+                USING ERRCODE = '28000';
+    END;
+END;
+$$;
+
+
+/*
+ * Anonymous-safe identity lookup.
+ *
+ * This helper is deliberately separate from current_user_id(). Use it only
+ * where anonymous access is an explicit part of the API contract (for example,
+ * PUBLIC/UNLISTED exact-ID reads). Authorization-sensitive code must use the
+ * fail-closed identity.current_user_id().
+ */
+CREATE FUNCTION identity.current_user_id_optional()
+RETURNS uuid
+LANGUAGE plpgsql
+STABLE
+PARALLEL SAFE
+SET search_path = pg_catalog
+AS $$
+DECLARE
+    v_raw text;
+BEGIN
+    v_raw := NULLIF(pg_catalog.current_setting('app.current_user_id', true), '');
+
+    IF v_raw IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    BEGIN
+        RETURN v_raw::uuid;
+    EXCEPTION
+        WHEN invalid_text_representation THEN
+            RAISE EXCEPTION 'Authenticated database user context is invalid'
+                USING ERRCODE = '28000';
+    END;
+END;
 $$;
 
 

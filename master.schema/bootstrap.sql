@@ -58,6 +58,13 @@
                  1211_security_validation.sql
                  1212_integrity_validation.sql
                  1214_extended_architecture_validation.sql
+                 1215_security_contract_validation.sql
+                 1216_adversarial_authorization_validation.sql
+                 1217_pgbouncer_transaction_context_validation.sql
+                 1218_api_surface_validation.sql
+                 1219_migration_framework_validation.sql
+                 1220_financial_readiness_validation.sql
+                 1221_operational_integrity_validation.sql
                  1213_dependency_validation.sql
                  Any failed assertion aborts the bootstrap transaction.
 ===============================================================================
@@ -117,6 +124,9 @@ BEGIN;
 
 \echo '[0004] Installing validation helpers...'
 \ir 0000_bootstrap/0004_validation_helpers.sql
+
+\echo '[0005] Installing forward-only migration framework...'
+\ir 0000_bootstrap/0005_migration_framework.sql
 
 \echo '[1200] Validating bootstrap infrastructure...'
 \ir 1200_validation/1200_bootstrap_validation.sql
@@ -399,6 +409,7 @@ BEGIN;
 \ir 0750_marketplace/0750_market_prices.sql
 \ir 0750_marketplace/0751_marketplace.sql
 \ir 0760_finance/0760_financial_ledger.sql
+\ir 0760_finance/0761_financial_readiness_anchors.sql
 
 \echo '[0700] MOC domain complete.'
 
@@ -560,12 +571,30 @@ BEGIN;
 \echo '[1107] Applying database privileges and grants...'
 \ir 1100_security/1107_grants.sql
 
+\echo '[1110] Locking down runtime API surface...'
+\ir 1100_security/1110_api_surface_lockdown.sql
+
+\echo '[1111] Separating runtime/admin/deployment ownership...'
+\ir 1100_security/1111_role_ownership_separation.sql
+
 \echo '[1211] Validating security configuration...'
 \ir 1200_validation/1211_security_validation.sql
 
 \echo '[1212] Validating cross-domain hardening...'
 \ir 1200_validation/1212_integrity_validation.sql
 \ir 1200_validation/1214_extended_architecture_validation.sql
+\ir 1200_validation/1215_security_contract_validation.sql
+\ir 1200_validation/1216_adversarial_authorization_validation.sql
+\ir 1200_validation/1217_pgbouncer_transaction_context_validation.sql
+\ir 1200_validation/1218_api_surface_validation.sql
+\echo '[1219] Validating migration framework...'
+\ir 1200_validation/1219_migration_framework_validation.sql
+\echo '[1220] Validating financial readiness invariants...'
+\ir 1200_validation/1220_financial_readiness_validation.sql
+\echo '[1221] Validating operational integrity and critical indexes...'
+\ir 1200_validation/1221_operational_integrity_validation.sql
+\echo '[1222] Validating role and ownership separation...'
+\ir 1200_validation/1222_role_separation_validation.sql
 \ir 1200_validation/1213_dependency_validation.sql
 
 \echo '[1100] Security domain complete.'
@@ -601,6 +630,22 @@ BEGIN;
 \ir 1200_validation/1211_security_validation.sql
 \ir 1200_validation/1212_integrity_validation.sql
 \ir 1200_validation/1214_extended_architecture_validation.sql
+\ir 1200_validation/1215_security_contract_validation.sql
+\echo '[1216] Running adversarial authorization tests...'
+\ir 1200_validation/1216_adversarial_authorization_validation.sql
+\echo '[1217] Validating PgBouncer transaction context...'
+\ir 1200_validation/1217_pgbouncer_transaction_context_validation.sql
+\echo '[1218] Validating runtime API surface...'
+\ir 1200_validation/1218_api_surface_validation.sql
+\echo '[1219] Validating migration framework...'
+\ir 1200_validation/1219_migration_framework_validation.sql
+\echo '[1220] Validating financial readiness invariants...'
+\ir 1200_validation/1220_financial_readiness_validation.sql
+\echo '[1221] Validating operational integrity and critical indexes...'
+\ir 1200_validation/1221_operational_integrity_validation.sql
+\echo '[1222] Validating role and ownership separation...'
+\ir 1200_validation/1222_role_separation_validation.sql
+
 \ir 1200_validation/1213_dependency_validation.sql
 
 \echo '[FINAL] Cross-domain validation passed.'

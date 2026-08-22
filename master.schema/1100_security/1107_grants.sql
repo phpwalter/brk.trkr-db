@@ -283,7 +283,8 @@ TO lego_importer;
  * Controlled application API role (preferred runtime boundary)
  * ========================================================================== */
 GRANT USAGE ON SCHEMA api TO lego_api;
-GRANT EXECUTE ON ALL ROUTINES IN SCHEMA api TO lego_api;
+/* Runtime EXECUTE grants are applied from the reviewed allowlist in
+ * 1110_api_surface_lockdown.sql. */
 
 /* No direct operational table privileges are granted to lego_api. */
 GRANT USAGE ON SCHEMA reporting TO lego_reporting;
@@ -301,8 +302,107 @@ GRANT SELECT, INSERT, UPDATE ON marketplace.market_price_observations TO lego_im
 
 /* Compatibility runtime may call the new safe API without direct access to new base tables. */
 GRANT USAGE ON SCHEMA api TO lego_app;
-GRANT EXECUTE ON ALL ROUTINES IN SCHEMA api TO lego_app;
+/* Runtime EXECUTE grants are applied from the reviewed allowlist in
+ * 1110_api_surface_lockdown.sql. */
 
 GRANT USAGE ON SCHEMA app TO lego_api;
+GRANT EXECUTE ON FUNCTION app.set_authenticated_user(uuid) TO lego_api;
 GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,text,text) TO lego_api;
+
+
+/* ==========================================================================
+ * Runtime execute-only hardening
+ * ==========================================================================
+ * Security contract:
+ *   - lego_api is the preferred runtime group role.
+ *   - lego_app is retained only as an execute-only compatibility group role.
+ *   - neither role may directly read or mutate application relations.
+ *
+ * These revokes intentionally override the historical direct-table grants
+ * above. Keep this block until the legacy grants are removed in a dedicated
+ * cleanup migration, so the effective privilege state remains safe.
+ * ========================================================================== */
+
+REVOKE ALL PRIVILEGES
+ON ALL TABLES IN SCHEMA
+    identity,
+    reference,
+    catalog,
+    definition,
+    collection,
+    wanted,
+    moc,
+    import,
+    audit,
+    marketplace,
+    finance,
+    operations,
+    reporting
+FROM lego_app;
+
+REVOKE ALL PRIVILEGES
+ON ALL SEQUENCES IN SCHEMA
+    identity,
+    reference,
+    catalog,
+    definition,
+    collection,
+    wanted,
+    moc,
+    import,
+    audit,
+    marketplace,
+    finance,
+    operations,
+    reporting
+FROM lego_app;
+
+REVOKE USAGE ON SCHEMA
+    identity,
+    reference,
+    catalog,
+    definition,
+    collection,
+    wanted,
+    moc,
+    import,
+    audit,
+    admin,
+    marketplace,
+    finance,
+    operations,
+    reporting
+FROM lego_app;
+
+REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA
+    app,
+    identity,
+    reference,
+    catalog,
+    definition,
+    collection,
+    wanted,
+    moc,
+    import,
+    audit,
+    admin,
+    marketplace,
+    finance,
+    operations,
+    reporting
+FROM lego_app;
+
+/* Both runtime group roles expose only the reviewed API surface plus
+ * non-authorizing request-correlation context. */
+GRANT USAGE ON SCHEMA api TO lego_api, lego_app;
+/* Deliberately no GRANT EXECUTE ON ALL ROUTINES here.  The runtime callable
+ * surface is granted explicitly by 1110_api_surface_lockdown.sql. */
+
+GRANT USAGE ON SCHEMA app TO lego_api, lego_app;
+GRANT EXECUTE ON FUNCTION app.set_authenticated_user(uuid)
+TO lego_api, lego_app;
+
+GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,text,text)
+TO lego_api, lego_app;
+
 SELECT pg_temp.bt_mark_completed('1100_security/1107_grants.sql');

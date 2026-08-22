@@ -1,0 +1,1 @@
+python tools/verify_schema_contract.py

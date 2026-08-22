@@ -11,6 +11,7 @@
                  0000_bootstrap/0002_types.sql
                  0000_bootstrap/0003_uuid.sql
                  0000_bootstrap/0004_validation_helpers.sql
+                 0000_bootstrap/0005_migration_framework.sql
  Creates:        No persistent database objects.
  Key Rules:      All required PostgreSQL extensions must be installed.
                  All application schemas must exist.
@@ -24,7 +25,7 @@
 */
 
 \set ON_ERROR_STOP on
-SELECT pg_temp.bt_preflight('1200_validation/1200_bootstrap_validation.sql', ARRAY['0000_bootstrap/0000_extensions.sql', '0000_bootstrap/0001_schemas.sql', '0000_bootstrap/0002_types.sql', '0000_bootstrap/0003_uuid.sql', '0000_bootstrap/0004_validation_helpers.sql']::text[]);
+SELECT pg_temp.bt_preflight('1200_validation/1200_bootstrap_validation.sql', ARRAY['0000_bootstrap/0000_extensions.sql', '0000_bootstrap/0001_schemas.sql', '0000_bootstrap/0002_types.sql', '0000_bootstrap/0003_uuid.sql', '0000_bootstrap/0004_validation_helpers.sql', '0000_bootstrap/0005_migration_framework.sql']::text[]);
 
 
 
@@ -151,6 +152,10 @@ BEGIN
 END;
 $$;
 
+
+
+SELECT app.assert_table_exists('app', 'schema_migration_baseline');
+SELECT app.assert_table_exists('app', 'schema_migrations');
 
 \echo '[VALIDATE PASS] 1200_bootstrap_validation.sql'
 SELECT pg_temp.bt_mark_completed('1200_validation/1200_bootstrap_validation.sql');
