@@ -18,10 +18,7 @@ SELECT pg_temp.bt_preflight('0400_definitions/0405_manifest_graph.sql', ARRAY['d
 
 
 
-ALTER TABLE definition.requirement_groups
-    ADD COLUMN requirement_key text,
-    ADD CONSTRAINT ck_requirement_groups_key
-        CHECK (requirement_key IS NULL OR btrim(requirement_key) <> '');
+-- requirement_key is defined canonically in 0402_requirement_groups.sql;
 
 CREATE UNIQUE INDEX uq_requirement_groups_version_key
     ON definition.requirement_groups(inventory_version_id, requirement_key)

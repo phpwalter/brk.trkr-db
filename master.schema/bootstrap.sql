@@ -523,6 +523,12 @@ BEGIN;
 \ir 1000_function/1013_operational_api.sql
 \ir 1000_function/1014_finance_function.sql
 
+\echo '[1015] Installing Rebrickable reference reconciliation...'
+\ir 1000_function/1015_rebrickable_reference_reconcile.sql
+
+\echo '[1016] Installing Rebrickable catalog reconciliation...'
+\ir 1000_function/1016_rebrickable_catalog_reconcile.sql
+
 \echo '[1210] Validating functions and runtime triggers...'
 \ir 1200_validation/1210_function_validation.sql
 

@@ -68,4 +68,14 @@ CREATE INDEX ix_part_variants_color
 SELECT app.assert_table_exists('catalog', 'part_variants');
 
 \echo '[PASS] 0315_part_variants.sql'
+
+/* Phase 4: one canonical base variant per part/color combination. */
+CREATE UNIQUE INDEX IF NOT EXISTS uq_part_variants_base_part_color
+    ON catalog.part_variants(part_catalog_item_id, color_id)
+    WHERE decoration_code IS NULL
+      AND mold_code IS NULL
+      AND is_printed = false
+      AND is_stickered = false
+      AND color_id IS NOT NULL;
+
 SELECT pg_temp.bt_mark_completed('0300_catalog/0315_part_variants.sql');

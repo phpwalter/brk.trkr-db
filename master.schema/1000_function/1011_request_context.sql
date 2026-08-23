@@ -107,6 +107,31 @@ BEGIN
 END;
 $$;
 
+/* Canonical importer provenance setter. */
+CREATE OR REPLACE FUNCTION app.set_import_context(
+    p_source_run_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog
+AS $$
+BEGIN
+    IF p_source_run_id IS NULL THEN
+        RAISE EXCEPTION 'Importer source run id is required'
+            USING ERRCODE = '22004';
+    END IF;
+
+    IF NOT pg_catalog.pg_has_role(session_user, 'lego_importer', 'MEMBER') THEN
+        RAISE EXCEPTION 'Importer database role is required'
+            USING ERRCODE = '42501';
+    END IF;
+
+    PERFORM pg_catalog.set_config('app.actor_class', 'IMPORTER', true);
+    PERFORM pg_catalog.set_config('app.source_run_id', p_source_run_id::text, true);
+END;
+$$;
+
 ALTER TABLE audit.events
     ADD COLUMN request_id uuid DEFAULT app.current_request_id(),
     ADD COLUMN trace_id text DEFAULT app.current_trace_id(),

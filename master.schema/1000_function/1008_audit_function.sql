@@ -71,6 +71,10 @@ DECLARE
     v_entity_id text;
     v_event_id uuid;
 
+    v_actor_class text;
+    v_actor_user_id uuid;
+    v_source_run_id uuid;
+
     v_key text;
 BEGIN
     IF TG_OP <> 'INSERT' THEN
@@ -87,19 +91,88 @@ BEGIN
             v_old ->> v_pk_column
         );
 
+    /*
+     * Actor contract:
+     *
+     * USER / ADMIN
+     *   Must have authenticated app.current_user_id and therefore remain
+     *   fail-closed through identity.current_user_id().
+     *
+     * IMPORTER
+     *   Represents source-driven canonical reconciliation, not a human actor.
+     *   Only a PostgreSQL login that is actually a member of lego_importer may
+     *   use this class, and source_run_id is mandatory provenance.
+     *
+     * SYSTEM
+     *   Remains fail-closed to an authenticated user unless a dedicated system
+     *   contract is introduced separately.
+     */
+    v_actor_class :=
+        COALESCE(
+            NULLIF(pg_catalog.current_setting('app.actor_class', true), ''),
+            'USER'
+        );
+
+    IF v_actor_class = 'IMPORTER' THEN
+        IF NOT pg_catalog.pg_has_role(
+            session_user,
+            'lego_importer',
+            'MEMBER'
+        ) THEN
+            RAISE EXCEPTION
+                'IMPORTER audit context requires lego_importer membership'
+                USING ERRCODE = '42501';
+        END IF;
+
+        BEGIN
+            v_source_run_id :=
+                NULLIF(
+                    pg_catalog.current_setting(
+                        'app.source_run_id',
+                        true
+                    ),
+                    ''
+                )::uuid;
+        EXCEPTION
+            WHEN invalid_text_representation THEN
+                RAISE EXCEPTION
+                    'IMPORTER audit context has malformed source_run_id'
+                    USING ERRCODE = '22023';
+        END;
+
+        IF v_source_run_id IS NULL THEN
+            RAISE EXCEPTION
+                'IMPORTER audit context requires source_run_id'
+                USING ERRCODE = '28000';
+        END IF;
+
+        v_actor_user_id := NULL;
+    ELSE
+        v_actor_user_id := identity.current_user_id();
+        v_source_run_id := NULLIF(
+            pg_catalog.current_setting(
+                'app.source_run_id',
+                true
+            ),
+            ''
+        )::uuid;
+    END IF;
+
     INSERT INTO audit.events (
         event_type,
         actor_user_id,
         entity_schema,
         entity_table,
-        entity_id
+        entity_id,
+        source_run_id
     )
     VALUES (
         TG_OP,
-        identity.current_user_id(),
+        v_actor_user_id,
         TG_TABLE_SCHEMA,
         TG_TABLE_NAME,
-        v_entity_id
+        v_entity_id,
+        v_source_run_id
     )
     RETURNING audit_event_id
     INTO v_event_id;

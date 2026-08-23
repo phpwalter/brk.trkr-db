@@ -111,3 +111,15 @@ SELECT app.assert_index_exists('catalog', 'uq_external_identifier_active');
 
 \echo '[PASS] 0317_external_identifiers.sql'
 SELECT pg_temp.bt_mark_completed('0300_catalog/0317_external_identifiers.sql');
+
+-- BEGIN BRICKTRACKR REBRICKABLE PHASE 5 CANONICAL: catalog.external_identifiers indexes
+CREATE INDEX IF NOT EXISTS ix_external_identifiers_active_lookup
+    ON catalog.external_identifiers (
+        source_id,
+        entity_namespace,
+        external_id
+    )
+    INCLUDE (catalog_item_id, part_variant_id)
+    WHERE source_present
+      AND external_version IS NULL;
+-- END BRICKTRACKR REBRICKABLE PHASE 5 CANONICAL: catalog.external_identifiers indexes

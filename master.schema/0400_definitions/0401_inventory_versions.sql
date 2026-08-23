@@ -137,3 +137,16 @@ SELECT app.assert_table_exists(
 
 \echo '[PASS] 0401_inventory_versions.sql'
 SELECT pg_temp.bt_mark_completed('0400_definitions/0401_inventory_versions.sql');
+
+-- BEGIN BRICKTRACKR REBRICKABLE PHASE 5 CANONICAL: definition.inventory_versions indexes
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_versions_source_identity
+    ON definition.inventory_versions (
+        source_id,
+        source_external_id,
+        source_external_version
+    )
+    WHERE source_id IS NOT NULL
+      AND source_external_id IS NOT NULL
+      AND source_external_version IS NOT NULL
+      AND NOT is_admin_correction;
+-- END BRICKTRACKR REBRICKABLE PHASE 5 CANONICAL: definition.inventory_versions indexes

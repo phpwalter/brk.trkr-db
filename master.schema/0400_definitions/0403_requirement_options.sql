@@ -116,3 +116,13 @@ SELECT app.assert_index_exists(
 
 \echo '[PASS] 0403_requirement_options.sql'
 SELECT pg_temp.bt_mark_completed('0400_definitions/0403_requirement_options.sql');
+
+-- BEGIN BRICKTRACKR REBRICKABLE PHASE 5 CANONICAL: definition.requirement_options indexes
+CREATE UNIQUE INDEX IF NOT EXISTS uq_requirement_options_group_target
+    ON definition.requirement_options (
+        requirement_group_id,
+        catalog_item_id,
+        part_variant_id
+    )
+    NULLS NOT DISTINCT;
+-- END BRICKTRACKR REBRICKABLE PHASE 5 CANONICAL: definition.requirement_options indexes

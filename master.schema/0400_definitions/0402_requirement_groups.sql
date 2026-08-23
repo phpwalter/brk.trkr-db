@@ -45,7 +45,7 @@ CREATE TABLE definition.requirement_groups (
 
     sort_order integer,
     notes text,
-
+    requirement_key text,
     CONSTRAINT pk_requirement_groups
         PRIMARY KEY (requirement_group_id),
 
@@ -90,3 +90,20 @@ SELECT app.assert_table_exists(
 
 \echo '[PASS] 0402_requirement_groups.sql'
 SELECT pg_temp.bt_mark_completed('0400_definitions/0402_requirement_groups.sql');
+
+-- BEGIN BRICKTRACKR REBRICKABLE PHASE 5 CANONICAL: definition.requirement_groups indexes
+
+ALTER TABLE definition.requirement_groups
+    ADD CONSTRAINT ck_requirement_groups_key
+    CHECK (
+        requirement_key IS NULL
+        OR btrim(requirement_key) <> ''
+    );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_requirement_groups_inventory_key
+    ON definition.requirement_groups (
+        inventory_version_id,
+        requirement_key
+    )
+    WHERE requirement_key IS NOT NULL;
+-- END BRICKTRACKR REBRICKABLE PHASE 5 CANONICAL: definition.requirement_groups indexes

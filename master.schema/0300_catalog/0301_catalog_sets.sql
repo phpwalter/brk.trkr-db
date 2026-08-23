@@ -25,7 +25,7 @@ SELECT pg_temp.bt_preflight('0300_catalog/0301_catalog_sets.sql', ARRAY['catalog
 CREATE TABLE catalog.sets (
     catalog_item_id uuid NOT NULL,
 
-    lego_set_id integer NOT NULL,
+    lego_set_id integer,
     theme_id integer,
     release_year smallint,
 

@@ -24,7 +24,7 @@ SELECT pg_temp.bt_preflight('0300_catalog/0316_lego_elements.sql', ARRAY['catalo
 CREATE TABLE catalog.lego_elements (
     lego_element_row_id uuid NOT NULL DEFAULT app.uuid_v7(),
 
-    lego_element_id integer NOT NULL,
+    lego_element_id BIGINT NOT NULL,
     part_variant_id uuid NOT NULL,
 
     valid_from date,
@@ -59,4 +59,9 @@ CREATE INDEX ix_lego_elements_variant
 SELECT app.assert_table_exists('catalog', 'lego_elements');
 
 \echo '[PASS] 0316_lego_elements.sql'
+
+/* Phase 4: source replays may only reuse the same element/variant identity. */
+CREATE UNIQUE INDEX IF NOT EXISTS uq_lego_elements_id_variant
+    ON catalog.lego_elements(lego_element_id, part_variant_id);
+
 SELECT pg_temp.bt_mark_completed('0300_catalog/0316_lego_elements.sql');

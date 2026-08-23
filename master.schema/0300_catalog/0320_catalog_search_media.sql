@@ -140,4 +140,5 @@ INSERT INTO catalog.item_search(catalog_item_id, search_text)
 SELECT catalog_item_id, concat_ws(' ', canonical_name, item_kind::text, status::text)
 FROM catalog.items
 ON CONFLICT DO NOTHING;
+
 SELECT pg_temp.bt_mark_completed('0300_catalog/0320_catalog_search_media.sql');

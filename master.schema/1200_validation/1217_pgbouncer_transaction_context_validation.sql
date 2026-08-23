@@ -9,6 +9,7 @@
  Depends On:     1200_validation/1216_adversarial_authorization_validation.sql
                  app.set_authenticated_user(uuid)
                  app.set_request_context(uuid,text,text)
+                 app.set_import_context(uuid)
                  identity.current_user_id()
                  identity.current_user_id_optional()
  Creates:        Validation assertions only
@@ -22,7 +23,7 @@
 ===============================================================================
 */
 \set ON_ERROR_STOP on
-SELECT pg_temp.bt_preflight('1200_validation/1217_pgbouncer_transaction_context_validation.sql', ARRAY['1200_validation/1216_adversarial_authorization_validation.sql', 'app.set_authenticated_user(uuid)', 'app.set_request_context(uuid,text,text)', 'identity.current_user_id()', 'identity.current_user_id_optional()']::text[]);
+SELECT pg_temp.bt_preflight('1200_validation/1217_pgbouncer_transaction_context_validation.sql', ARRAY['1200_validation/1216_adversarial_authorization_validation.sql', 'app.set_authenticated_user(uuid)', 'app.set_request_context(uuid,text,text)', 'app.set_import_context(uuid)', 'identity.current_user_id()', 'identity.current_user_id_optional()']::text[]);
 
 \echo '[VALIDATE] 1217_pgbouncer_transaction_context_validation.sql'
 
@@ -97,7 +98,7 @@ SELECT app.assert_true(
     'app.set_request_context(uuid,text,text) must remain transaction-local and search-path pinned'
 );
 
-/* No stored routine may create a second writer for request-scoped context. */
+/* Request/trace IDs may be written only by the canonical request setter. */
 SELECT app.assert_true(
     NOT EXISTS (
         SELECT 1
@@ -106,7 +107,6 @@ SELECT app.assert_true(
          WHERE (
                 p.prosrc ~* 'set_config[[:space:]]*\([[:space:]]*''app\.request_id'''
              OR p.prosrc ~* 'set_config[[:space:]]*\([[:space:]]*''app\.trace_id'''
-             OR p.prosrc ~* 'set_config[[:space:]]*\([[:space:]]*''app\.actor_class'''
          )
            AND NOT (
                n.nspname = 'app'
@@ -117,7 +117,77 @@ SELECT app.assert_true(
                AND p.proargtypes[2] = 'text'::regtype
            )
     ),
-    'Request context GUCs may be written only by app.set_request_context(uuid,text,text)'
+    'Request/trace GUCs may be written only by app.set_request_context(uuid,text,text)'
+);
+
+/* actor_class has two approved transaction-local writers. */
+SELECT app.assert_true(
+    NOT EXISTS (
+        SELECT 1
+          FROM pg_proc p
+          JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE p.prosrc ~* 'set_config[[:space:]]*\([[:space:]]*''app\.actor_class'''
+           AND NOT (
+                (
+                    n.nspname = 'app'
+                    AND p.proname = 'set_request_context'
+                    AND p.pronargs = 3
+                    AND p.proargtypes[0] = 'uuid'::regtype
+                    AND p.proargtypes[1] = 'text'::regtype
+                    AND p.proargtypes[2] = 'text'::regtype
+                )
+                OR
+                (
+                    n.nspname = 'app'
+                    AND p.proname = 'set_import_context'
+                    AND p.pronargs = 1
+                    AND p.proargtypes[0] = 'uuid'::regtype
+                )
+           )
+    ),
+    'app.actor_class may be written only by approved request/import context setters'
+);
+
+/* Import source provenance has one approved transaction-local writer. */
+SELECT app.assert_true(
+    NOT EXISTS (
+        SELECT 1
+          FROM pg_proc p
+          JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE p.prosrc ~* 'set_config[[:space:]]*\([[:space:]]*''app\.source_run_id'''
+           AND NOT (
+               n.nspname = 'app'
+               AND p.proname = 'set_import_context'
+               AND p.pronargs = 1
+               AND p.proargtypes[0] = 'uuid'::regtype
+           )
+    ),
+    'app.source_run_id may be written only by app.set_import_context(uuid)'
+);
+
+/* Canonical importer setter must be invoker-safe, pinned, and transaction-local. */
+SELECT app.assert_true(
+    EXISTS (
+        SELECT 1
+          FROM pg_proc p
+          JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE n.nspname = 'app'
+           AND p.proname = 'set_import_context'
+           AND p.pronargs = 1
+           AND p.proargtypes[0] = 'uuid'::regtype
+           AND NOT p.prosecdef
+           AND EXISTS (
+               SELECT 1
+                 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) cfg
+                WHERE cfg = 'search_path=pg_catalog'
+           )
+           AND p.prosrc LIKE '%app.actor_class%'
+           AND p.prosrc LIKE '%app.source_run_id%'
+           AND p.prosrc LIKE '%set_config%'
+           AND regexp_replace(p.prosrc, '[[:space:]]', '', 'g')
+               LIKE '%true)%'
+    ),
+    'app.set_import_context(uuid) must remain transaction-local and search-path pinned'
 );
 
 /*
@@ -133,7 +203,8 @@ SELECT app.assert_true(
              'app.current_user_id',
              'app.request_id',
              'app.trace_id',
-             'app.actor_class'
+             'app.actor_class',
+             'app.source_run_id'
          )
     ),
     'Request-scoped GUCs must not be configured as role/database defaults'
@@ -148,6 +219,14 @@ SELECT app.assert_true(
     'Runtime roles must be able to establish transaction-local authenticated/request context'
 );
 
+/* Importer provenance setter is importer-only. */
+SELECT app.assert_true(
+    has_function_privilege('lego_importer', 'app.set_import_context(uuid)', 'EXECUTE')
+    AND NOT has_function_privilege('lego_api', 'app.set_import_context(uuid)', 'EXECUTE')
+    AND NOT has_function_privilege('lego_app', 'app.set_import_context(uuid)', 'EXECUTE'),
+    'Only lego_importer may execute app.set_import_context(uuid)'
+);
+
 /* PUBLIC must not be able to invoke either context setter. */
 SELECT app.assert_true(
     NOT EXISTS (
@@ -158,7 +237,7 @@ SELECT app.assert_true(
               coalesce(p.proacl, acldefault('f', p.proowner))
           ) a
          WHERE n.nspname = 'app'
-           AND p.proname IN ('set_authenticated_user', 'set_request_context')
+           AND p.proname IN ('set_authenticated_user', 'set_request_context', 'set_import_context')
            AND a.grantee = 0
            AND a.privilege_type = 'EXECUTE'
     ),
