@@ -1141,6 +1141,28 @@ BEGIN
         (p_source_run_id, 'P4B_FINALIZE', 105)
     ON CONFLICT (source_run_id, step_name) DO NOTHING;
 
+    /*
+     * Only rows whose PART resolves through the current authoritative
+     * Rebrickable PART identifier set are canonical Phase 4B work.
+     *
+     * Rebrickable can temporarily publish elements that reference a part_num
+     * absent from parts.csv. Those rows remain preserved in staging as source
+     * evidence, but they must not make checkpoint accounting impossible.
+     */
+    SELECT count(*)
+      INTO v_rows
+    FROM import.source_stage_records sr
+    JOIN catalog.external_identifiers pei
+      ON pei.source_id = v_source_id
+     AND pei.entity_namespace = 'PART'
+     AND pei.external_id = sr.normalized_payload->>'part_num'
+     AND pei.external_version IS NULL
+     AND pei.source_present
+     AND pei.catalog_item_id IS NOT NULL
+    WHERE sr.source_run_id = p_source_run_id
+      AND sr.dataset_name = 'elements'
+      AND sr.entity_namespace = 'ELEMENT';
+
     INSERT INTO import.source_run_step_progress (
         source_run_id, step_name, substep_name,
         step_order, substep_order, rows_expected
@@ -1301,10 +1323,20 @@ BEGIN
     ELSIF p_step_name = 'P4B_VALIDATE'
       AND p_substep_name = 'PART_REFERENCES'
     THEN
+        /*
+         * Internal reconciliation defects remain fatal:
+         * an active authoritative PART identifier exists, but it has no
+         * canonical catalog item.
+         *
+         * If no active PART identifier exists at all, the inconsistency is in
+         * the upstream Rebrickable snapshot (elements.csv references a
+         * part_num absent from parts.csv). Preserve those element rows in
+         * staging and exclude them from canonical Phase 4B DML.
+         */
         IF EXISTS (
             SELECT 1
             FROM import.source_stage_records sr
-            LEFT JOIN catalog.external_identifiers ei
+            JOIN catalog.external_identifiers ei
               ON ei.source_id = v_source_id
              AND ei.entity_namespace = 'PART'
              AND ei.external_id = sr.normalized_payload->>'part_num'
@@ -1316,7 +1348,7 @@ BEGIN
               AND ei.catalog_item_id IS NULL
         ) THEN
             RAISE EXCEPTION
-                'One or more Phase 4 elements reference a PART not reconciled in Phase 3'
+                'One or more Phase 4 elements reference a PART present in the authoritative PART snapshot but not reconciled in Phase 3'
                 USING ERRCODE = '23503';
         END IF;
         v_batch_rows := 1;
@@ -1564,9 +1596,23 @@ BEGIN
     ELSIF p_step_name = 'P4B_FINALIZE'
       AND p_substep_name = 'VERIFY_COUNTS'
     THEN
+        /*
+         * Every staged element whose PART is resolvable must have a current
+         * ELEMENT external identifier backed by a part variant.
+         *
+         * Rows whose part_num is absent from the authoritative PART snapshot
+         * remain staging-only source evidence and are intentionally excluded.
+         */
         IF EXISTS (
             SELECT 1
             FROM import.source_stage_records sr
+            JOIN catalog.external_identifiers pei
+              ON pei.source_id = v_source_id
+             AND pei.entity_namespace = 'PART'
+             AND pei.external_id = sr.normalized_payload->>'part_num'
+             AND pei.external_version IS NULL
+             AND pei.source_present
+             AND pei.catalog_item_id IS NOT NULL
             WHERE sr.source_run_id = p_source_run_id
               AND sr.dataset_name = 'elements'
               AND sr.entity_namespace = 'ELEMENT'
@@ -1581,7 +1627,7 @@ BEGIN
                     AND ei.part_variant_id IS NOT NULL
               )
         ) THEN
-            RAISE EXCEPTION 'Phase 4B final verification found unmapped staged elements'
+            RAISE EXCEPTION 'Phase 4B final verification found unmapped resolvable staged elements'
                 USING ERRCODE = '23514';
         END IF;
         v_batch_rows := 1;
@@ -2043,139 +2089,163 @@ BEGIN
     ELSIF p_step_name = 'P5B_VALIDATE'
       AND p_substep_name = 'CATALOG_REFERENCES'
     THEN
-        /* For resolvable parents, every child catalog target must resolve.
-           Orphan/unresolved-parent children are excluded from this requirement. */
+        /*
+         * Resolve authoritative inventory parents once and reuse that compact
+         * indexed working set for all child-reference validation.
+         *
+         * Source-truth policy:
+         *   - unresolved/orphan parents remain staged source evidence;
+         *   - active/current authoritative PART rows that fail canonical
+         *     resolution are fatal;
+         *   - retired/upstream-missing PART identifiers are preserved as
+         *     source evidence and skipped by canonical membership processing.
+         */
+        DROP TABLE IF EXISTS pg_temp.bt_p5b_resolvable_parent;
+
+        CREATE TEMP TABLE bt_p5b_resolvable_parent
+        ON COMMIT DROP
+        AS
+        SELECT DISTINCT
+            inv.normalized_payload->>'inventory_id' AS inventory_id,
+            CASE
+                WHEN sei.catalog_item_id IS NOT NULL THEN 'SET'
+                ELSE 'MINIFIGURE'
+            END::text AS parent_kind
+        FROM import.source_stage_records inv
+        LEFT JOIN catalog.external_identifiers sei
+          ON sei.source_id = v_source_id
+         AND sei.entity_namespace = 'SET'
+         AND sei.external_id = inv.normalized_payload->>'set_num'
+         AND sei.external_version IS NULL
+         AND sei.source_present
+        LEFT JOIN catalog.external_identifiers mei
+          ON mei.source_id = v_source_id
+         AND mei.entity_namespace = 'MINIFIGURE'
+         AND mei.external_id = inv.normalized_payload->>'set_num'
+         AND mei.external_version IS NULL
+         AND mei.source_present
+        WHERE inv.source_run_id = p_source_run_id
+          AND inv.dataset_name = 'inventories'
+          AND inv.entity_namespace = 'INVENTORY'
+          AND num_nonnulls(sei.catalog_item_id, mei.catalog_item_id) = 1;
+
+        CREATE UNIQUE INDEX bt_p5b_resolvable_parent_pk
+            ON bt_p5b_resolvable_parent(inventory_id);
+
+        CREATE INDEX bt_p5b_resolvable_parent_kind
+            ON bt_p5b_resolvable_parent(parent_kind, inventory_id);
+
+        ANALYZE bt_p5b_resolvable_parent;
+
+        /*
+         * Fatal only when a currently authoritative Rebrickable PART exists
+         * but has no canonical catalog target.
+         *
+         * A historically known/retired PART (source_present = false), such as
+         * 35756pr0001 in the observed source data, is not fatal here.
+         */
         IF EXISTS (
-            WITH parent AS (
-                SELECT
-                    inv.normalized_payload->>'inventory_id' AS inventory_id
-                FROM import.source_stage_records inv
-                LEFT JOIN catalog.external_identifiers sei
-                  ON sei.source_id = v_source_id
-                 AND sei.entity_namespace = 'SET'
-                 AND sei.external_id = inv.normalized_payload->>'set_num'
-                 AND sei.external_version IS NULL
-                 AND sei.source_present
-                LEFT JOIN catalog.external_identifiers mei
-                  ON mei.source_id = v_source_id
-                 AND mei.entity_namespace = 'MINIFIGURE'
-                 AND mei.external_id = inv.normalized_payload->>'set_num'
-                 AND mei.external_version IS NULL
-                 AND mei.source_present
-                WHERE inv.source_run_id = p_source_run_id
-                  AND inv.dataset_name = 'inventories'
-                  AND inv.entity_namespace = 'INVENTORY'
-                  AND num_nonnulls(sei.catalog_item_id, mei.catalog_item_id) = 1
-            )
             SELECT 1
             FROM import.source_stage_records sr
-            JOIN parent p
+            JOIN bt_p5b_resolvable_parent p
               ON p.inventory_id = sr.normalized_payload->>'inventory_id'
-            LEFT JOIN catalog.external_identifiers pei
+            JOIN catalog.external_identifiers pei
               ON pei.source_id = v_source_id
              AND pei.entity_namespace = 'PART'
              AND pei.external_id = sr.normalized_payload->>'part_num'
              AND pei.external_version IS NULL
              AND pei.source_present
-            LEFT JOIN reference.external_color_mappings cm
-              ON cm.source_id = v_source_id
-             AND cm.external_color_id = sr.normalized_payload->>'color_id'
-             AND cm.valid_to IS NULL
             WHERE sr.source_run_id = p_source_run_id
               AND sr.dataset_name = 'inventory_parts'
               AND sr.entity_namespace = 'INVENTORY_PART'
-              AND (pei.catalog_item_id IS NULL OR cm.color_id IS NULL)
+              AND pei.catalog_item_id IS NULL
             LIMIT 1
         ) THEN
-            RAISE EXCEPTION 'Resolvable inventory references an unresolved part or color'
+            RAISE EXCEPTION
+                'Authoritative inventory PART failed canonical resolution'
                 USING ERRCODE = '23503';
         END IF;
 
+        /* Resolvable parent -> every inventory part color must resolve. */
         IF EXISTS (
-            WITH set_parent AS (
-                SELECT inv.normalized_payload->>'inventory_id' AS inventory_id
-                FROM import.source_stage_records inv
-                JOIN catalog.external_identifiers sei
-                  ON sei.source_id = v_source_id
-                 AND sei.entity_namespace = 'SET'
-                 AND sei.external_id = inv.normalized_payload->>'set_num'
-                 AND sei.external_version IS NULL
-                 AND sei.source_present
-                LEFT JOIN catalog.external_identifiers mei
-                  ON mei.source_id = v_source_id
-                 AND mei.entity_namespace = 'MINIFIGURE'
-                 AND mei.external_id = inv.normalized_payload->>'set_num'
-                 AND mei.external_version IS NULL
-                 AND mei.source_present
-                WHERE inv.source_run_id = p_source_run_id
-                  AND inv.dataset_name = 'inventories'
-                  AND inv.entity_namespace = 'INVENTORY'
-                  AND mei.catalog_item_id IS NULL
-            )
             SELECT 1
             FROM import.source_stage_records sr
-            JOIN set_parent p
+            JOIN bt_p5b_resolvable_parent p
               ON p.inventory_id = sr.normalized_payload->>'inventory_id'
-            LEFT JOIN catalog.external_identifiers child
-              ON child.source_id = v_source_id
-             AND child.entity_namespace = 'SET'
-             AND child.external_id = sr.normalized_payload->>'set_num'
-             AND child.external_version IS NULL
-             AND child.source_present
+            WHERE sr.source_run_id = p_source_run_id
+              AND sr.dataset_name = 'inventory_parts'
+              AND sr.entity_namespace = 'INVENTORY_PART'
+              AND NOT EXISTS (
+                    SELECT 1
+                    FROM reference.external_color_mappings cm
+                    WHERE cm.source_id = v_source_id
+                      AND cm.external_color_id = sr.normalized_payload->>'color_id'
+                      AND cm.valid_to IS NULL
+              )
+            LIMIT 1
+        ) THEN
+            RAISE EXCEPTION
+                'Resolvable inventory references an unresolved color'
+                USING ERRCODE = '23503';
+        END IF;
+
+        /* SET parent -> child SET must resolve. */
+        IF EXISTS (
+            SELECT 1
+            FROM import.source_stage_records sr
+            JOIN bt_p5b_resolvable_parent p
+              ON p.inventory_id = sr.normalized_payload->>'inventory_id'
+             AND p.parent_kind = 'SET'
             WHERE sr.source_run_id = p_source_run_id
               AND sr.dataset_name = 'inventory_sets'
               AND sr.entity_namespace = 'INVENTORY_SET'
-              AND child.catalog_item_id IS NULL
+              AND NOT EXISTS (
+                    SELECT 1
+                    FROM catalog.external_identifiers child
+                    WHERE child.source_id = v_source_id
+                      AND child.entity_namespace = 'SET'
+                      AND child.external_id = sr.normalized_payload->>'set_num'
+                      AND child.external_version IS NULL
+                      AND child.source_present
+                      AND child.catalog_item_id IS NOT NULL
+              )
             LIMIT 1
         ) THEN
-            RAISE EXCEPTION 'Resolvable SET inventory references unresolved child SET'
+            RAISE EXCEPTION
+                'Resolvable SET inventory references unresolved child SET'
                 USING ERRCODE = '23503';
         END IF;
 
+        /* SET parent -> child MINIFIGURE must resolve. */
         IF EXISTS (
-            WITH set_parent AS (
-                SELECT inv.normalized_payload->>'inventory_id' AS inventory_id
-                FROM import.source_stage_records inv
-                JOIN catalog.external_identifiers sei
-                  ON sei.source_id = v_source_id
-                 AND sei.entity_namespace = 'SET'
-                 AND sei.external_id = inv.normalized_payload->>'set_num'
-                 AND sei.external_version IS NULL
-                 AND sei.source_present
-                LEFT JOIN catalog.external_identifiers mei
-                  ON mei.source_id = v_source_id
-                 AND mei.entity_namespace = 'MINIFIGURE'
-                 AND mei.external_id = inv.normalized_payload->>'set_num'
-                 AND mei.external_version IS NULL
-                 AND mei.source_present
-                WHERE inv.source_run_id = p_source_run_id
-                  AND inv.dataset_name = 'inventories'
-                  AND inv.entity_namespace = 'INVENTORY'
-                  AND mei.catalog_item_id IS NULL
-            )
             SELECT 1
             FROM import.source_stage_records sr
-            JOIN set_parent p
+            JOIN bt_p5b_resolvable_parent p
               ON p.inventory_id = sr.normalized_payload->>'inventory_id'
-            LEFT JOIN catalog.external_identifiers child
-              ON child.source_id = v_source_id
-             AND child.entity_namespace = 'MINIFIGURE'
-             AND child.external_id = sr.normalized_payload->>'fig_num'
-             AND child.external_version IS NULL
-             AND child.source_present
+             AND p.parent_kind = 'SET'
             WHERE sr.source_run_id = p_source_run_id
               AND sr.dataset_name = 'inventory_minifigs'
               AND sr.entity_namespace = 'INVENTORY_MINIFIGURE'
-              AND child.catalog_item_id IS NULL
+              AND NOT EXISTS (
+                    SELECT 1
+                    FROM catalog.external_identifiers child
+                    WHERE child.source_id = v_source_id
+                      AND child.entity_namespace = 'MINIFIGURE'
+                      AND child.external_id = sr.normalized_payload->>'fig_num'
+                      AND child.external_version IS NULL
+                      AND child.source_present
+                      AND child.catalog_item_id IS NOT NULL
+              )
             LIMIT 1
         ) THEN
-            RAISE EXCEPTION 'Resolvable SET inventory references unresolved child MINIFIGURE'
+            RAISE EXCEPTION
+                'Resolvable SET inventory references unresolved child MINIFIGURE'
                 USING ERRCODE = '23503';
         END IF;
 
         v_batch_rows := 1;
 
-    ELSIF p_step_name = 'P5B_VALIDATE'
+ELSIF p_step_name = 'P5B_VALIDATE'
       AND p_substep_name = 'VERSION_KEYS'
     THEN
         IF EXISTS (
@@ -2371,6 +2441,7 @@ BEGIN
         SELECT
             inv.source_row_number,
             inv.normalized_payload->>'inventory_id' AS inventory_id,
+            inv.normalized_payload->>'set_num' AS parent_external_id,
             (inv.normalized_payload->>'version')::integer AS source_version,
             d.inventory_definition_id
         FROM import.source_stage_records inv
@@ -2406,6 +2477,137 @@ BEGIN
         FROM bt_p5b_batch;
 
         IF v_batch_rows > 0 THEN
+            /*
+             * A finalized source version is immutable. Re-seeing the exact same
+             * Rebrickable inventory version must therefore be a no-op, not a
+             * metadata update.
+             *
+             * Before accepting that no-op, recompute the current snapshot hash
+             * using the exact Phase 5 hash algorithm. If Rebrickable reused the
+             * same inventory_id+version for different content, fail loudly
+             * rather than silently mutating or ignoring immutable history.
+             */
+            /*
+             * Compare current staged graph to the ORIGINAL staged graph that
+             * produced an existing finalized source version.
+             *
+             * source_row_number is transport/order metadata and is excluded.
+             * Duplicate child rows remain significant.
+             */
+            IF EXISTS (
+                WITH existing AS (
+                    SELECT
+                        b.inventory_id,
+                        b.parent_external_id,
+                        b.source_version,
+                        iv.inventory_version_id,
+                        iv.source_run_id AS original_source_run_id
+                    FROM bt_p5b_batch b
+                    JOIN definition.inventory_versions iv
+                      ON iv.source_id = v_source_id
+                     AND iv.source_external_id = b.inventory_id
+                     AND iv.source_external_version = b.source_version
+                     AND NOT iv.is_admin_correction
+                     AND iv.status = 'FINALIZED'::definition.inventory_version_status
+                ),
+                current_graph AS (
+                    SELECT
+                        e.inventory_version_id,
+                        pg_catalog.sha256(
+                            pg_catalog.convert_to(
+                                e.parent_external_id
+                                || E'\nVERSION=' || e.source_version::text
+                                || E'\n'
+                                || COALESCE(
+                                    string_agg(
+                                        sr.dataset_name || ':' || sr.normalized_payload::text,
+                                        E'\n'
+                                        ORDER BY sr.dataset_name, sr.normalized_payload::text
+                                    ) FILTER (WHERE sr.dataset_name IS NOT NULL),
+                                    ''
+                                ),
+                                'UTF8'
+                            )
+                        ) AS semantic_graph_hash
+                    FROM existing e
+                    LEFT JOIN import.source_stage_records sr
+                      ON sr.source_run_id = p_source_run_id
+                     AND sr.dataset_name IN (
+                         'inventory_parts',
+                         'inventory_sets',
+                         'inventory_minifigs'
+                     )
+                     AND sr.normalized_payload->>'inventory_id' = e.inventory_id
+                    GROUP BY
+                        e.inventory_version_id,
+                        e.parent_external_id,
+                        e.source_version
+                ),
+                original_parent AS (
+                    SELECT
+                        e.inventory_version_id,
+                        e.inventory_id,
+                        e.source_version,
+                        e.original_source_run_id,
+                        inv.normalized_payload->>'set_num' AS parent_external_id
+                    FROM existing e
+                    LEFT JOIN import.source_stage_records inv
+                      ON inv.source_run_id = e.original_source_run_id
+                     AND inv.dataset_name = 'inventories'
+                     AND inv.entity_namespace = 'INVENTORY'
+                     AND inv.normalized_payload->>'inventory_id' = e.inventory_id
+                     AND (inv.normalized_payload->>'version')::integer = e.source_version
+                ),
+                original_graph AS (
+                    SELECT
+                        op.inventory_version_id,
+                        op.original_source_run_id,
+                        op.parent_external_id,
+                        pg_catalog.sha256(
+                            pg_catalog.convert_to(
+                                op.parent_external_id
+                                || E'\nVERSION=' || op.source_version::text
+                                || E'\n'
+                                || COALESCE(
+                                    string_agg(
+                                        sr.dataset_name || ':' || sr.normalized_payload::text,
+                                        E'\n'
+                                        ORDER BY sr.dataset_name, sr.normalized_payload::text
+                                    ) FILTER (WHERE sr.dataset_name IS NOT NULL),
+                                    ''
+                                ),
+                                'UTF8'
+                            )
+                        ) AS semantic_graph_hash
+                    FROM original_parent op
+                    LEFT JOIN import.source_stage_records sr
+                      ON sr.source_run_id = op.original_source_run_id
+                     AND sr.dataset_name IN (
+                         'inventory_parts',
+                         'inventory_sets',
+                         'inventory_minifigs'
+                     )
+                     AND sr.normalized_payload->>'inventory_id' = op.inventory_id
+                    GROUP BY
+                        op.inventory_version_id,
+                        op.original_source_run_id,
+                        op.parent_external_id,
+                        op.source_version
+                )
+                SELECT 1
+                FROM current_graph cur
+                JOIN original_graph orig
+                  ON orig.inventory_version_id = cur.inventory_version_id
+                WHERE orig.original_source_run_id IS NULL
+                   OR orig.parent_external_id IS NULL
+                   OR cur.semantic_graph_hash IS DISTINCT FROM orig.semantic_graph_hash
+                LIMIT 1
+            ) THEN
+                RAISE EXCEPTION
+                    'Existing finalized inventory source version differs from current normalized source graph, or original staging is unavailable'
+                    USING ERRCODE = '23514';
+            END IF;
+
             INSERT INTO definition.inventory_versions(
                 inventory_definition_id,
                 semantic_version,
@@ -2435,9 +2637,7 @@ BEGIN
               AND source_external_id IS NOT NULL
               AND source_external_version IS NOT NULL
               AND NOT is_admin_correction
-            DO UPDATE SET
-                last_seen_at = EXCLUDED.last_seen_at,
-                source_run_id = EXCLUDED.source_run_id;
+            DO NOTHING;
         ELSE
             v_batch_last := v_last;
         END IF;
@@ -2502,6 +2702,7 @@ BEGIN
              AND iv.source_external_id = inv.normalized_payload->>'inventory_id'
              AND iv.source_external_version = (inv.normalized_payload->>'version')::integer
              AND NOT iv.is_admin_correction
+             AND iv.status = 'DRAFT'::definition.inventory_version_status
             JOIN catalog.external_identifiers pei
               ON pei.source_id = v_source_id
              AND pei.entity_namespace = 'PART'
@@ -2566,6 +2767,7 @@ BEGIN
              AND iv.source_external_id = inv.normalized_payload->>'inventory_id'
              AND iv.source_external_version = (inv.normalized_payload->>'version')::integer
              AND NOT iv.is_admin_correction
+             AND iv.status = 'DRAFT'::definition.inventory_version_status
             JOIN catalog.external_identifiers child
               ON child.source_id = v_source_id
              AND child.entity_namespace = 'SET'
@@ -2619,6 +2821,7 @@ BEGIN
              AND iv.source_external_id = inv.normalized_payload->>'inventory_id'
              AND iv.source_external_version = (inv.normalized_payload->>'version')::integer
              AND NOT iv.is_admin_correction
+             AND iv.status = 'DRAFT'::definition.inventory_version_status
             JOIN catalog.external_identifiers child
               ON child.source_id = v_source_id
              AND child.entity_namespace = 'MINIFIGURE'
@@ -2629,9 +2832,14 @@ BEGIN
 
         END IF;
 
+        /*
+         * Checkpoint progress is source-scan progress, not canonical-DML row
+         * count. Finalized-version rows are deliberately skipped for mutation
+         * but must still advance the durable source cursor.
+         */
         SELECT count(*), max(source_row_number)
           INTO v_batch_rows, v_batch_last
-        FROM bt_p5b_batch;
+        FROM bt_p5b_source_batch;
 
         IF v_batch_rows > 0 THEN
             INSERT INTO definition.requirement_groups(
@@ -2656,13 +2864,12 @@ BEGIN
                 'Rebrickable authoritative inventory member',
                 b.requirement_key
             FROM bt_p5b_batch b
+            JOIN definition.inventory_versions iv_guard
+              ON iv_guard.inventory_version_id = b.inventory_version_id
+             AND iv_guard.status = 'DRAFT'::definition.inventory_version_status
             ON CONFLICT (inventory_version_id, requirement_key)
             WHERE requirement_key IS NOT NULL
-            DO UPDATE SET
-                required_quantity = EXCLUDED.required_quantity,
-                is_required = EXCLUDED.is_required,
-                is_spare = EXCLUDED.is_spare,
-                sort_order = EXCLUDED.sort_order;
+            DO NOTHING;
 
             INSERT INTO definition.requirement_options(
                 requirement_group_id,
@@ -2681,10 +2888,11 @@ BEGIN
             JOIN definition.requirement_groups rg
               ON rg.inventory_version_id = b.inventory_version_id
              AND rg.requirement_key = b.requirement_key
+            JOIN definition.inventory_versions iv_guard
+              ON iv_guard.inventory_version_id = rg.inventory_version_id
+             AND iv_guard.status = 'DRAFT'::definition.inventory_version_status
             ON CONFLICT (requirement_group_id, catalog_item_id, part_variant_id)
-            DO UPDATE SET
-                option_quantity = EXCLUDED.option_quantity,
-                is_primary = true;
+            DO NOTHING;
         ELSE
             v_batch_last := v_last;
         END IF;
@@ -2696,6 +2904,20 @@ BEGIN
     ELSIF p_step_name = 'P5B_MINIFIG_MEMBERS'
       AND p_substep_name = 'PARTS'
     THEN
+        DROP TABLE IF EXISTS pg_temp.bt_p5b_source_batch;
+        CREATE TEMP TABLE bt_p5b_source_batch ON COMMIT DROP AS
+        SELECT
+            sr.source_run_id,
+            sr.source_row_number,
+            sr.normalized_payload
+        FROM import.source_stage_records sr
+        WHERE sr.source_run_id = p_source_run_id
+          AND sr.dataset_name = 'inventory_parts'
+          AND sr.entity_namespace = 'INVENTORY_PART'
+          AND sr.source_row_number > v_last
+        ORDER BY sr.source_row_number
+        LIMIT p_batch_size;
+
         DROP TABLE IF EXISTS pg_temp.bt_p5b_batch;
         CREATE TEMP TABLE bt_p5b_batch ON COMMIT DROP AS
         SELECT
@@ -2705,7 +2927,7 @@ BEGIN
             (sr.normalized_payload->>'quantity')::bigint AS quantity,
             (sr.normalized_payload->>'is_spare')::boolean AS is_spare,
             pv.part_variant_id
-        FROM import.source_stage_records sr
+        FROM bt_p5b_source_batch sr
         JOIN import.source_stage_records inv
           ON inv.source_run_id = sr.source_run_id
          AND inv.dataset_name = 'inventories'
@@ -2729,6 +2951,7 @@ BEGIN
          AND iv.source_external_id = inv.normalized_payload->>'inventory_id'
          AND iv.source_external_version = (inv.normalized_payload->>'version')::integer
          AND NOT iv.is_admin_correction
+         AND iv.status = 'DRAFT'::definition.inventory_version_status
         JOIN catalog.external_identifiers pei
           ON pei.source_id = v_source_id
          AND pei.entity_namespace = 'PART'
@@ -2746,17 +2969,11 @@ BEGIN
          AND pv.mold_code IS NULL
          AND pv.is_printed = false
          AND pv.is_stickered = false
-        WHERE sr.source_run_id = p_source_run_id
-          AND sr.dataset_name = 'inventory_parts'
-          AND sr.entity_namespace = 'INVENTORY_PART'
-          AND sr.source_row_number > v_last
-          AND parent_set.catalog_item_id IS NULL
-        ORDER BY sr.source_row_number
-        LIMIT p_batch_size;
+        WHERE parent_set.catalog_item_id IS NULL;
 
         SELECT count(*), max(source_row_number)
           INTO v_batch_rows, v_batch_last
-        FROM bt_p5b_batch;
+        FROM bt_p5b_source_batch;
 
         IF v_batch_rows > 0 THEN
             INSERT INTO definition.requirement_groups(
@@ -2781,13 +2998,12 @@ BEGIN
                 'Rebrickable minifigure part; semantic role not asserted',
                 b.requirement_key
             FROM bt_p5b_batch b
+            JOIN definition.inventory_versions iv_guard
+              ON iv_guard.inventory_version_id = b.inventory_version_id
+             AND iv_guard.status = 'DRAFT'::definition.inventory_version_status
             ON CONFLICT (inventory_version_id, requirement_key)
             WHERE requirement_key IS NOT NULL
-            DO UPDATE SET
-                required_quantity = EXCLUDED.required_quantity,
-                is_required = EXCLUDED.is_required,
-                is_spare = EXCLUDED.is_spare,
-                sort_order = EXCLUDED.sort_order;
+            DO NOTHING;
 
             INSERT INTO definition.requirement_options(
                 requirement_group_id,
@@ -2806,10 +3022,11 @@ BEGIN
             JOIN definition.requirement_groups rg
               ON rg.inventory_version_id = b.inventory_version_id
              AND rg.requirement_key = b.requirement_key
+            JOIN definition.inventory_versions iv_guard
+              ON iv_guard.inventory_version_id = rg.inventory_version_id
+             AND iv_guard.status = 'DRAFT'::definition.inventory_version_status
             ON CONFLICT (requirement_group_id, catalog_item_id, part_variant_id)
-            DO UPDATE SET
-                option_quantity = EXCLUDED.option_quantity,
-                is_primary = true;
+            DO NOTHING;
         ELSE
             v_batch_last := v_last;
         END IF;
@@ -2820,12 +3037,26 @@ BEGIN
     ELSIF p_step_name = 'P5B_MINIFIG_ANCHORS'
       AND p_substep_name = 'COMPOSITIONS'
     THEN
+        DROP TABLE IF EXISTS pg_temp.bt_p5b_source_batch;
+        CREATE TEMP TABLE bt_p5b_source_batch ON COMMIT DROP AS
+        SELECT
+            inv.source_run_id,
+            inv.source_row_number,
+            inv.normalized_payload
+        FROM import.source_stage_records inv
+        WHERE inv.source_run_id = p_source_run_id
+          AND inv.dataset_name = 'inventories'
+          AND inv.entity_namespace = 'INVENTORY'
+          AND inv.source_row_number > v_last
+        ORDER BY inv.source_row_number
+        LIMIT p_batch_size;
+
         DROP TABLE IF EXISTS pg_temp.bt_p5b_batch;
         CREATE TEMP TABLE bt_p5b_batch ON COMMIT DROP AS
         SELECT
             inv.source_row_number,
             iv.inventory_version_id
-        FROM import.source_stage_records inv
+        FROM bt_p5b_source_batch inv
         JOIN catalog.external_identifiers parent_fig
           ON parent_fig.source_id = v_source_id
          AND parent_fig.entity_namespace = 'MINIFIGURE'
@@ -2843,22 +3074,20 @@ BEGIN
          AND iv.source_external_id = inv.normalized_payload->>'inventory_id'
          AND iv.source_external_version = (inv.normalized_payload->>'version')::integer
          AND NOT iv.is_admin_correction
-        WHERE inv.source_run_id = p_source_run_id
-          AND inv.dataset_name = 'inventories'
-          AND inv.entity_namespace = 'INVENTORY'
-          AND inv.source_row_number > v_last
-          AND parent_set.catalog_item_id IS NULL
-        ORDER BY inv.source_row_number
-        LIMIT p_batch_size;
+         AND iv.status = 'DRAFT'::definition.inventory_version_status
+        WHERE parent_set.catalog_item_id IS NULL;
 
         SELECT count(*), max(source_row_number)
           INTO v_batch_rows, v_batch_last
-        FROM bt_p5b_batch;
+        FROM bt_p5b_source_batch;
 
         IF v_batch_rows > 0 THEN
             INSERT INTO definition.minifig_compositions(inventory_version_id)
-            SELECT inventory_version_id
-            FROM bt_p5b_batch
+            SELECT b.inventory_version_id
+            FROM bt_p5b_batch b
+            JOIN definition.inventory_versions iv_guard
+              ON iv_guard.inventory_version_id = b.inventory_version_id
+             AND iv_guard.status = 'DRAFT'::definition.inventory_version_status
             ON CONFLICT (inventory_version_id) DO NOTHING;
         ELSE
             v_batch_last := v_last;
@@ -2939,11 +3168,10 @@ BEGIN
                             || E'\n'
                             || COALESCE(
                                 string_agg(
-                                    dataset_name
-                                    || ':' || source_row_number::text
-                                    || ':' || payload_text,
-                                    E'\n'
-                                    ORDER BY dataset_name, source_row_number
+                                    dataset_name || ':' || payload_text,
+                                    E'
+'
+                                    ORDER BY dataset_name, payload_text
                                 ) FILTER (WHERE dataset_name IS NOT NULL),
                                 ''
                             ),
@@ -3117,7 +3345,7 @@ BEGIN
             jsonb_build_object(
                 'phase5b_inventory',
                 jsonb_build_object(
-                    'strategy', 'checkpointed-v5.1.2',
+                    'strategy', 'checkpointed-v5.1.7-source-batch-contract',
                     'unresolved_parent_policy', 'SOURCE_EVIDENCE_ONLY',
                     'orphan_child_policy', 'SOURCE_EVIDENCE_ONLY',
                     'minifig_role_policy', 'NOT_INFERRED',

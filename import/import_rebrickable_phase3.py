@@ -21,15 +21,11 @@ import io
 import json
 import os
 import sys
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID
 
 import psycopg
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 # Windows PowerShell commonly launches Python with a legacy console code page.
 # Rebrickable catalog text is UTF-8 and may contain characters outside cp1252.
@@ -42,11 +38,7 @@ if hasattr(sys.stderr, "reconfigure"):
 
 IMPORTER_VERSION = "3.0.3"
 SOURCE_CODE = "REBRICKABLE"
-BASE_URL = "https://cdn.rebrickable.com/media/downloads"
 
-CONNECT_TIMEOUT = 20
-READ_TIMEOUT = 180
-MAX_ATTEMPTS = 5
 CHUNK_SIZE = 1024 * 1024
 
 
@@ -101,106 +93,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--work-dir",
         type=Path,
-        default=Path("rebrickable-downloads"),
-    )
-    p.add_argument(
-        "--keep-downloads",
-        action="store_true",
+        default=Path(__file__).resolve().parent / "rebrickable-downloads",
     )
     return p.parse_args()
-
-
-def create_session() -> requests.Session:
-    retry = Retry(
-        total=4,
-        connect=4,
-        read=4,
-        status=4,
-        backoff_factor=1.0,
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=frozenset({"GET", "HEAD"}),
-        raise_on_status=False,
-        respect_retry_after_header=True,
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    s = requests.Session()
-    s.mount("https://", adapter)
-    s.mount("http://", adapter)
-    s.headers.update(
-        {
-            "User-Agent": f"BrickTrackr-Rebrickable-Importer/{IMPORTER_VERSION}",
-            "Accept": "application/gzip,application/octet-stream,*/*",
-        }
-    )
-    return s
-
-
-def download(contract: DatasetContract, work_dir: Path) -> Path:
-    work_dir.mkdir(parents=True, exist_ok=True)
-    target = work_dir / f"{contract.name}.csv.gz"
-    temp = work_dir / f"{contract.name}.csv.gz.part"
-    url = f"{BASE_URL}/{contract.name}.csv.gz"
-    last_error: Exception | None = None
-
-    for attempt in range(1, MAX_ATTEMPTS + 1):
-        try:
-            if temp.exists():
-                temp.unlink()
-
-            print(
-                f"[*] Downloading {contract.name}.csv.gz "
-                f"(attempt {attempt}/{MAX_ATTEMPTS})..."
-            )
-
-            with create_session() as session:
-                with session.get(
-                    url,
-                    stream=True,
-                    timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
-                ) as response:
-                    response.raise_for_status()
-                    with temp.open("wb") as fh:
-                        for chunk in response.iter_content(CHUNK_SIZE):
-                            if chunk:
-                                fh.write(chunk)
-                        fh.flush()
-                        os.fsync(fh.fileno())
-
-            if temp.stat().st_size <= 0:
-                raise RuntimeError("downloaded archive is empty")
-
-            # Full read validates the gzip trailer/CRC.
-            with gzip.open(temp, "rb") as gz:
-                while gz.read(CHUNK_SIZE):
-                    pass
-
-            temp.replace(target)
-            print(
-                f"[+] Download verified: {target.name} "
-                f"({target.stat().st_size:,} bytes)"
-            )
-            return target
-
-        except (
-            requests.RequestException,
-            OSError,
-            EOFError,
-            gzip.BadGzipFile,
-            RuntimeError,
-        ) as exc:
-            last_error = exc
-            if temp.exists():
-                temp.unlink(missing_ok=True)
-
-            if attempt < MAX_ATTEMPTS:
-                delay = min(30.0, 2.0 ** (attempt - 1))
-                print(f"[!] Download failed: {exc}")
-                print(f"[*] Retrying in {delay:.1f}s...")
-                time.sleep(delay)
-
-    raise RuntimeError(
-        f"Unable to download {contract.name!r}: {last_error}"
-    )
 
 
 def sha256_file(path: Path) -> bytes:
@@ -565,16 +460,26 @@ def run() -> int:
     try:
         args.work_dir.mkdir(parents=True, exist_ok=True)
 
-        # Download and validate the whole Phase-3 snapshot before database staging.
+        # Validate the prepared Phase-3 snapshot before database staging.
+        # Network I/O belongs to the top-level initial/nightly wrapper.
         evidence: dict[str, tuple[int, bytes]] = {}
         for contract in DATASETS:
-            path = download(contract, args.work_dir)
+            path = args.work_dir / f"{contract.name}.csv.gz"
+            if not path.is_file():
+                raise RuntimeError(
+                    f"{contract.name}: required snapshot archive not found: {path}"
+                )
+            if path.stat().st_size <= 0:
+                raise RuntimeError(
+                    f"{contract.name}: snapshot archive is empty: {path}"
+                )
+
             downloaded[contract.name] = path
             row_count, _headers = validate_archive(contract, path)
             checksum = sha256_file(path)
             evidence[contract.name] = (row_count, checksum)
             print(
-                f"[+] {contract.name}: {row_count:,} rows, "
+                f"[+] {contract.name}: snapshot verified {row_count:,} rows, "
                 f"sha256={checksum.hex()}"
             )
 
@@ -656,14 +561,6 @@ def run() -> int:
             file=sys.stderr,
         )
         return 1
-    finally:
-        if not args.keep_downloads:
-            for path in downloaded.values():
-                try:
-                    path.unlink(missing_ok=True)
-                except OSError:
-                    pass
-
 
 if __name__ == "__main__":
     raise SystemExit(run())

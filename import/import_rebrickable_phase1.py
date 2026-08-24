@@ -37,21 +37,14 @@ Security
   import.source_stage_records in Phase 1.
 - Never writes directly to canonical reference/catalog tables.
 
-Network safety
---------------
-- Downloads each .csv.gz completely before staging.
-- Retries complete downloads after transport/gzip failures.
-- fsyncs the archive.
-- verifies gzip CRC/trailer by reading to EOF.
-- computes SHA-256 on the downloaded archive.
-- validates required CSV columns while tolerating additive source columns.
-- validates and normalizes every record before any row from that dataset is
-  staged.
-
-Snapshot safety
----------------
-ALL Phase-1 archives must download and validate before staging begins.
-Therefore a network failure cannot leave a partially staged Phase-1 snapshot.
+Snapshot contract
+-----------------
+- This phase performs no network I/O.
+- A complete fresh Rebrickable snapshot must already exist in --work-dir.
+- The top-level initial/nightly wrapper owns downloading all 12 archives.
+- This phase verifies gzip CRC/trailer, computes SHA-256, validates required
+  CSV columns and normalizes every record before staging.
+- ALL Phase-1 archives are validated before staging begins.
 """
 
 from __future__ import annotations
@@ -64,8 +57,6 @@ import io
 import os
 import re
 import sys
-import tempfile
-import time
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -73,24 +64,15 @@ from typing import Any, Callable, Iterator
 from uuid import UUID
 
 import psycopg
-import requests
 
 from psycopg import Connection
 from psycopg.types.json import Jsonb
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 
 # =============================================================================
 # Configuration
 # =============================================================================
 
-REBRICKABLE_BASE_URL = "https://cdn.rebrickable.com/media/downloads"
-
-HTTP_CONNECT_TIMEOUT_SECONDS = 20
-HTTP_READ_TIMEOUT_SECONDS = 180
-DOWNLOAD_MAX_ATTEMPTS = 5
-DOWNLOAD_RETRY_BASE_DELAY_SECONDS = 2.0
 DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 
 SOURCE_CODE = "REBRICKABLE"
@@ -235,37 +217,6 @@ PHASE1_DATASETS: tuple[DatasetContract, ...] = (
 # HTTP / download
 # =============================================================================
 
-def create_http_session() -> requests.Session:
-    retry_policy = Retry(
-        total=4,
-        connect=4,
-        read=4,
-        status=4,
-        backoff_factor=1.0,
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=frozenset({"GET", "HEAD"}),
-        raise_on_status=False,
-        respect_retry_after_header=True,
-    )
-
-    adapter = HTTPAdapter(
-        max_retries=retry_policy,
-        pool_connections=4,
-        pool_maxsize=4,
-    )
-
-    session = requests.Session()
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    session.headers.update(
-        {
-            "User-Agent": "BrickTrackr-Rebrickable-Importer/2.0",
-            "Accept": "application/gzip,application/octet-stream,*/*",
-        }
-    )
-    return session
-
-
 def verify_gzip_archive(path: Path) -> None:
     with gzip.open(path, "rb") as stream:
         while stream.read(DOWNLOAD_CHUNK_SIZE):
@@ -351,109 +302,35 @@ def validate_and_count_csv(
     return row_count
 
 
-def download_dataset(
+def load_dataset_from_snapshot(
     contract: DatasetContract,
     work_dir: Path,
 ) -> DownloadedDataset:
-    url = f"{REBRICKABLE_BASE_URL}/{contract.name}.csv.gz"
-    last_exception: Exception | None = None
+    archive_path = work_dir / f"{contract.name}.csv.gz"
 
-    for attempt in range(1, DOWNLOAD_MAX_ATTEMPTS + 1):
-        archive_path = work_dir / f"{contract.name}.csv.gz"
-        session = create_http_session()
+    if not archive_path.is_file():
+        raise RuntimeError(
+            f"{contract.name}: required snapshot archive not found: {archive_path}"
+        )
+    if archive_path.stat().st_size <= 0:
+        raise RuntimeError(
+            f"{contract.name}: snapshot archive is empty: {archive_path}"
+        )
 
-        try:
-            if archive_path.exists():
-                archive_path.unlink()
+    verify_gzip_archive(archive_path)
+    checksum = sha256_file(archive_path)
+    row_count = validate_and_count_csv(archive_path, contract)
 
-            print(
-                f"[*] Downloading {contract.name}.csv.gz "
-                f"(attempt {attempt}/{DOWNLOAD_MAX_ATTEMPTS})..."
-            )
+    print(
+        f"[+] {contract.name}: snapshot verified "
+        f"{row_count:,} rows, sha256={checksum}"
+    )
 
-            with archive_path.open("wb") as target:
-                with session.get(
-                    url,
-                    stream=True,
-                    timeout=(
-                        HTTP_CONNECT_TIMEOUT_SECONDS,
-                        HTTP_READ_TIMEOUT_SECONDS,
-                    ),
-                ) as response:
-                    response.raise_for_status()
-
-                    for chunk in response.iter_content(
-                        chunk_size=DOWNLOAD_CHUNK_SIZE
-                    ):
-                        if chunk:
-                            target.write(chunk)
-
-                target.flush()
-                os.fsync(target.fileno())
-
-            if archive_path.stat().st_size <= 0:
-                raise RuntimeError(
-                    f"{contract.name}: downloaded archive is empty"
-                )
-
-            verify_gzip_archive(archive_path)
-            checksum = sha256_file(archive_path)
-            row_count = validate_and_count_csv(archive_path, contract)
-
-            print(
-                f"[+] {contract.name}: verified "
-                f"{row_count:,} rows, sha256={checksum}"
-            )
-
-            return DownloadedDataset(
-                contract=contract,
-                archive_path=archive_path,
-                checksum_sha256_hex=checksum,
-                source_row_count=row_count,
-            )
-
-        except (
-            requests.exceptions.RequestException,
-            ConnectionResetError,
-            ConnectionAbortedError,
-            BrokenPipeError,
-            EOFError,
-            gzip.BadGzipFile,
-            OSError,
-            RuntimeError,
-            ValueError,
-        ) as exc:
-            last_exception = exc
-
-            try:
-                if archive_path.exists():
-                    archive_path.unlink()
-            except OSError:
-                pass
-
-            # Contract/data errors are deterministic and should not be retried.
-            if isinstance(exc, (ValueError, RuntimeError)) and not isinstance(
-                exc, requests.exceptions.RequestException
-            ):
-                raise
-
-            if attempt >= DOWNLOAD_MAX_ATTEMPTS:
-                break
-
-            delay = DOWNLOAD_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
-            print(
-                f"[!] Download failure for {contract.name}: {exc}",
-                file=sys.stderr,
-            )
-            print(f"[*] Retrying in {delay:.1f}s...")
-            time.sleep(delay)
-
-        finally:
-            session.close()
-
-    raise RuntimeError(
-        f"{contract.name}: unable to download after "
-        f"{DOWNLOAD_MAX_ATTEMPTS} attempts; last error={last_exception}"
+    return DownloadedDataset(
+        contract=contract,
+        archive_path=archive_path,
+        checksum_sha256_hex=checksum,
+        source_row_count=row_count,
     )
 
 
@@ -841,7 +718,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "BrickTrackr Rebrickable importer Phase 1: "
-            "download, validate and stage reference datasets"
+            "validate and stage reference datasets from a prepared snapshot"
         )
     )
     parser.add_argument(
@@ -855,16 +732,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--work-dir",
         type=Path,
-        default=None,
-        help=(
-            "Directory for downloaded archives. Default: secure temporary "
-            "directory."
-        ),
-    )
-    parser.add_argument(
-        "--keep-downloads",
-        action="store_true",
-        help="Keep downloaded .csv.gz files after the run.",
+        default=Path(__file__).resolve().parent / "rebrickable-downloads",
+        help="Directory containing the prepared Rebrickable *.csv.gz snapshot.",
     )
     return parser.parse_args()
 
@@ -877,14 +746,13 @@ def run(args: argparse.Namespace) -> int:
         )
         return 2
 
-    temp_dir: tempfile.TemporaryDirectory[str] | None = None
-
-    if args.work_dir is None:
-        temp_dir = tempfile.TemporaryDirectory(prefix="bricktrackr_rebrickable_")
-        work_dir = Path(temp_dir.name)
-    else:
-        work_dir = args.work_dir.resolve()
-        work_dir.mkdir(parents=True, exist_ok=True)
+    work_dir = args.work_dir.resolve()
+    if not work_dir.is_dir():
+        print(
+            f"[FAIL] Snapshot directory not found: {work_dir}",
+            file=sys.stderr,
+        )
+        return 2
 
     source_run_id: UUID | None = None
     active_dataset: str | None = None
@@ -903,17 +771,18 @@ def run(args: argparse.Namespace) -> int:
             print(f"[+] Created source run: {source_run_id}")
 
             # -----------------------------------------------------------------
-            # Download + validate ALL Phase-1 datasets before staging any.
+            # Validate ALL Phase-1 datasets from the prepared snapshot before
+            # staging any data. Network I/O belongs to the top-level wrapper.
             # -----------------------------------------------------------------
             downloaded: list[DownloadedDataset] = []
 
             for contract in PHASE1_DATASETS:
                 active_dataset = contract.name
-                dataset = download_dataset(contract, work_dir)
+                dataset = load_dataset_from_snapshot(contract, work_dir)
                 record_dataset_download(conn, source_run_id, dataset)
                 downloaded.append(dataset)
 
-            print("[+] All Phase-1 archives downloaded and validated.")
+            print("[+] All Phase-1 snapshot archives validated.")
 
             # -----------------------------------------------------------------
             # Stage only after the complete Phase-1 snapshot is available.
@@ -976,25 +845,6 @@ def run(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
-
-    finally:
-        if temp_dir is not None:
-            if args.keep_downloads:
-                # TemporaryDirectory cannot be retained safely after cleanup;
-                # copy to a user-specified --work-dir when retention is needed.
-                print(
-                    "[!] --keep-downloads with an automatic temporary directory "
-                    "cannot retain files. Use --work-dir to retain downloads.",
-                    file=sys.stderr,
-                )
-            temp_dir.cleanup()
-        elif not args.keep_downloads:
-            for contract in PHASE1_DATASETS:
-                path = work_dir / f"{contract.name}.csv.gz"
-                try:
-                    path.unlink()
-                except FileNotFoundError:
-                    pass
 
 
 def main() -> None:

@@ -528,6 +528,7 @@ BEGIN;
 
 \echo '[1016] Installing Rebrickable catalog reconciliation...'
 \ir 1000_function/1016_rebrickable_catalog_reconcile.sql
+\ir 1000_function/1020_fail_source_run.sql
 
 \echo '[1210] Validating functions and runtime triggers...'
 \ir 1200_validation/1210_function_validation.sql
