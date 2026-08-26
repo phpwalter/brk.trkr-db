@@ -13,12 +13,12 @@
                  1100_security/1104_rls_mocs.sql
                  1100_security/1105_rls_imports.sql
                  1100_security/1106_rls_audit.sql
-                 1000_function/1020_fail_source_run.sql
+                 5000_function/5000_importer/5012_importer_fail_source_run.sql
 ===============================================================================
 */
 
 \set ON_ERROR_STOP on
-SELECT pg_temp.bt_preflight('1100_security/1107_grants.sql', ARRAY['1100_security/1100_roles.sql', '1100_security/1101_rls_identity.sql', '1100_security/1102_rls_collections.sql', '1100_security/1103_rls_wanted.sql', '1100_security/1104_rls_mocs.sql', '1100_security/1105_rls_imports.sql', '1100_security/1106_rls_audit.sql', '1000_function/1020_fail_source_run.sql']::text[]);
+SELECT pg_temp.bt_preflight('1100_security/1107_grants.sql', ARRAY['1100_security/1100_roles.sql', '1100_security/1101_rls_identity.sql', '1100_security/1102_rls_collections.sql', '1100_security/1103_rls_wanted.sql', '1100_security/1104_rls_mocs.sql', '1100_security/1105_rls_imports.sql', '1100_security/1106_rls_audit.sql', '5000_function/5000_importer/5012_importer_fail_source_run.sql']::text[]);
 
 
 

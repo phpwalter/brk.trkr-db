@@ -120,7 +120,12 @@ SELECT app.assert_true(
     'Request/trace GUCs may be written only by app.set_request_context(uuid,text,text)'
 );
 
-/* actor_class has two approved transaction-local writers. */
+/*
+ * actor_class has five approved transaction-local writers:
+ * - the canonical request/import context setters; and
+ * - the three reviewed admin lifecycle entry points, which set ADMIN only
+ *   after admin.assert_system_admin() succeeds and restore the prior value.
+ */
 SELECT app.assert_true(
     NOT EXISTS (
         SELECT 1
@@ -143,9 +148,31 @@ SELECT app.assert_true(
                     AND p.pronargs = 1
                     AND p.proargtypes[0] = 'uuid'::regtype
                 )
+                OR
+                (
+                    n.nspname = 'admin'
+                    AND p.proname IN (
+                        'retire_catalog_item',
+                        'archive_catalog_item'
+                    )
+                    AND p.pronargs = 2
+                    AND p.proargtypes[0] = 'uuid'::regtype
+                    AND p.proargtypes[1] = 'text'::regtype
+                    AND p.prosecdef
+                )
+                OR
+                (
+                    n.nspname = 'admin'
+                    AND p.proname = 'restore_catalog_item'
+                    AND p.pronargs = 3
+                    AND p.proargtypes[0] = 'uuid'::regtype
+                    AND p.proargtypes[1] = 'text'::regtype
+                    AND p.proargtypes[2] = 'text'::regtype
+                    AND p.prosecdef
+                )
            )
     ),
-    'app.actor_class may be written only by approved request/import context setters'
+    'app.actor_class may be written only by approved request/import setters or reviewed admin lifecycle entry points'
 );
 
 /* Import source provenance has one approved transaction-local writer. */

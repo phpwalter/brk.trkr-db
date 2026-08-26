@@ -9,12 +9,31 @@
                  objects, and SECURITY DEFINER routines must be hardened.
  Depends On:     1100_security/1107_grants.sql
                  1100_security/1110_api_surface_lockdown.sql
-                 Complete 1000_function domain
+                 5000_function/5700_system/5700_system_identity.sql
+                 5000_function/5700_system/5701_system_hierarchy.sql
+                 5000_function/5700_system/5702_system_catalog.sql
+                 5000_function/5700_system/5703_system_definition.sql
+                 5000_function/5700_system/5704_system_collection.sql
+                 5000_function/5700_system/5705_system_wanted.sql
+                 5000_function/5700_system/5706_system_moc.sql
+                 5000_function/5000_importer/5000_importer_common.sql
+                 5000_function/5700_system/5707_system_audit.sql
+                 5000_function/5700_system/5708_system_integrity_hardening.sql
+                 5000_function/5200_api/5200_api_moc_access.sql
+                 5000_function/5700_system/5709_system_request_context.sql
+                 5000_function/5100_admin/5120_admin_definition_graph.sql
+                 5000_function/5200_api/5210_api_operational.sql
+                 5000_function/5100_admin/5130_admin_finance.sql
+                 5000_function/5000_importer/5010_importer_rebrickable_reference_reconcile.sql
+                 5000_function/5000_importer/5011_importer_rebrickable_catalog_reconcile.sql
+                 5000_function/5000_importer/5012_importer_fail_source_run.sql
+                 5000_function/5100_admin/5100_admin_common.sql
+                 5000_function/5100_admin/5110_admin_catalog_lifecycle.sql
  Creates:        Validation assertions only
 ===============================================================================
 */
 \set ON_ERROR_STOP on
-SELECT pg_temp.bt_preflight('1200_validation/1215_security_contract_validation.sql', ARRAY['1100_security/1107_grants.sql', '1100_security/1110_api_surface_lockdown.sql', 'Complete 1000_function domain']::text[]);
+SELECT pg_temp.bt_preflight('1200_validation/1215_security_contract_validation.sql', ARRAY['1100_security/1107_grants.sql', '1100_security/1110_api_surface_lockdown.sql', '5000_function/5700_system/5700_system_identity.sql', '5000_function/5700_system/5701_system_hierarchy.sql', '5000_function/5700_system/5702_system_catalog.sql', '5000_function/5700_system/5703_system_definition.sql', '5000_function/5700_system/5704_system_collection.sql', '5000_function/5700_system/5705_system_wanted.sql', '5000_function/5700_system/5706_system_moc.sql', '5000_function/5000_importer/5000_importer_common.sql', '5000_function/5700_system/5707_system_audit.sql', '5000_function/5700_system/5708_system_integrity_hardening.sql', '5000_function/5200_api/5200_api_moc_access.sql', '5000_function/5700_system/5709_system_request_context.sql', '5000_function/5100_admin/5120_admin_definition_graph.sql', '5000_function/5200_api/5210_api_operational.sql', '5000_function/5100_admin/5130_admin_finance.sql', '5000_function/5000_importer/5010_importer_rebrickable_reference_reconcile.sql', '5000_function/5000_importer/5011_importer_rebrickable_catalog_reconcile.sql', '5000_function/5000_importer/5012_importer_fail_source_run.sql', '5000_function/5100_admin/5100_admin_common.sql', '5000_function/5100_admin/5110_admin_catalog_lifecycle.sql']::text[]);
 
 \echo '[VALIDATE] 1215_security_contract_validation.sql'
 

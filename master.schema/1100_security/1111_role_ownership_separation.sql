@@ -45,7 +45,7 @@ COMMENT ON ROLE lego_deployer IS
  */
 CREATE TEMP TABLE bt_owner_membership_state (
     added_temporarily boolean NOT NULL
-) ON COMMIT DROP;
+) ON COMMIT PRESERVE ROWS;
 
 INSERT INTO pg_temp.bt_owner_membership_state(added_temporarily)
 SELECT current_user <> 'lego_owner'
@@ -228,5 +228,7 @@ BEGIN
     END IF;
 END;
 $$;
+
+DROP TABLE pg_temp.bt_owner_membership_state;
 
 SELECT pg_temp.bt_mark_completed('1100_security/1111_role_ownership_separation.sql');

@@ -5,13 +5,13 @@
  Schema Version: 1.0.0
  PostgreSQL:     16+
  Purpose:        Validate cross-domain integrity hardening and regression guards.
- Depends On:     1000_function/1009_integrity_hardening.sql
+ Depends On:     5000_function/5700_system/5708_system_integrity_hardening.sql
                  1100_security/1108_rls_catalog_definition.sql
 ===============================================================================
 */
 
 \set ON_ERROR_STOP on
-SELECT pg_temp.bt_preflight('1200_validation/1212_integrity_validation.sql', ARRAY['1000_function/1009_integrity_hardening.sql', '1100_security/1108_rls_catalog_definition.sql']::text[]);
+SELECT pg_temp.bt_preflight('1200_validation/1212_integrity_validation.sql', ARRAY['5000_function/5700_system/5708_system_integrity_hardening.sql', '1100_security/1108_rls_catalog_definition.sql']::text[]);
 
 
 

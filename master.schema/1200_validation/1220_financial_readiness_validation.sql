@@ -8,14 +8,14 @@
                  future schema/API changes cannot weaken provenance, precision,
                  idempotency, immutability, or currency safety.
  Depends On:     0760_finance/0761_financial_readiness_anchors.sql
-                 1000_function/1014_finance_function.sql
+                 5000_function/5100_admin/5130_admin_finance.sql
                  1100_security/1107_grants.sql
                  1200_validation/1219_migration_framework_validation.sql
  Creates:        Validation assertions only
 ===============================================================================
 */
 \set ON_ERROR_STOP on
-SELECT pg_temp.bt_preflight('1200_validation/1220_financial_readiness_validation.sql', ARRAY['0760_finance/0761_financial_readiness_anchors.sql', '1000_function/1014_finance_function.sql', '1100_security/1107_grants.sql', '1200_validation/1219_migration_framework_validation.sql']::text[]);
+SELECT pg_temp.bt_preflight('1200_validation/1220_financial_readiness_validation.sql', ARRAY['0760_finance/0761_financial_readiness_anchors.sql', '5000_function/5100_admin/5130_admin_finance.sql', '1100_security/1107_grants.sql', '1200_validation/1219_migration_framework_validation.sql']::text[]);
 
 \echo '[VALIDATE] 1220_financial_readiness_validation.sql'
 

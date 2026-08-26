@@ -1,5 +1,6 @@
 /.idea/*
-/.idea/brk.trkr-db.iml
-/.idea/material_theme_project_new.xml
-/logs/rebrickable/
-/import/logs/
+/logs/*
+/import/logs/*
+/import/runtime/*
+/_archive/*
+/import/rebrickable-downloads/*
