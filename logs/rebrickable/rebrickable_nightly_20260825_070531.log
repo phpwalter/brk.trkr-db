@@ -1,0 +1,7 @@
+﻿2026-08-25T07:05:31.1533016-05:00 [INFO] BrickTrackr nightly Rebrickable refresh starting.
+2026-08-25T07:05:31.1613000-05:00 [INFO] Database: localhost:5432/bricktrackr
+2026-08-25T07:05:31.1623020-05:00 [INFO] Importer: bricktrackr_import
+2026-08-25T07:05:31.1633004-05:00 [INFO] Log: L:\var\www\Brk.Trkr\brk.trkr-db\logs\rebrickable\rebrickable_nightly_20260825_070531.log
+2026-08-25T07:05:31.1832998-05:00 [ERROR] Nightly refresh is already running under PID 24248.
+2026-08-25T07:05:31.1852997-05:00 [ERROR] at <ScriptBlock>, L:\var\www\Brk.Trkr\brk.trkr-db\run_rebrickable_nightly.ps1: line 143
+2026-08-25T07:05:31.1862997-05:00 [ERROR] Nightly Rebrickable refresh failed after 00:00:00.

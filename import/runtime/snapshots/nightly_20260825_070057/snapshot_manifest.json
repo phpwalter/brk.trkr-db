@@ -1,0 +1,178 @@
+{
+  "base_url": "https://cdn.rebrickable.com/media/downloads",
+  "completed_at_utc": "2026-08-25T12:01:01.329579+00:00",
+  "dataset_count": 12,
+  "datasets": [
+    {
+      "bytes": 4508,
+      "dataset": "themes",
+      "filename": "themes.csv.gz",
+      "headers": [
+        "id",
+        "name",
+        "parent_id"
+      ],
+      "rows": 496,
+      "sha256": "620ead9d1ce5f79eeddd13dbd6cc18b3c34717f594d6ca60180d8956b4eff253",
+      "url": "https://cdn.rebrickable.com/media/downloads/themes.csv.gz"
+    },
+    {
+      "bytes": 4890,
+      "dataset": "colors",
+      "filename": "colors.csv.gz",
+      "headers": [
+        "id",
+        "name",
+        "rgb",
+        "is_trans",
+        "num_parts",
+        "num_sets",
+        "y1",
+        "y2"
+      ],
+      "rows": 275,
+      "sha256": "9263b6b9e43446e9f8f40226c22f29bcc7cb97bb8dd7e66bb2c1fcc56b74e66f",
+      "url": "https://cdn.rebrickable.com/media/downloads/colors.csv.gz"
+    },
+    {
+      "bytes": 856,
+      "dataset": "part_categories",
+      "filename": "part_categories.csv.gz",
+      "headers": [
+        "id",
+        "name"
+      ],
+      "rows": 76,
+      "sha256": "45517dbe3f967d79d359018faf7a4e5869b7b907265b3aa0a97c3f5c077759bd",
+      "url": "https://cdn.rebrickable.com/media/downloads/part_categories.csv.gz"
+    },
+    {
+      "bytes": 1061966,
+      "dataset": "parts",
+      "filename": "parts.csv.gz",
+      "headers": [
+        "part_num",
+        "name",
+        "part_cat_id",
+        "part_material"
+      ],
+      "rows": 64347,
+      "sha256": "2afe3df8db15772da2862fc10f45fc7255b93df38e9fda21274f3e9e5b5051c3",
+      "url": "https://cdn.rebrickable.com/media/downloads/parts.csv.gz"
+    },
+    {
+      "bytes": 514075,
+      "dataset": "sets",
+      "filename": "sets.csv.gz",
+      "headers": [
+        "set_num",
+        "name",
+        "year",
+        "theme_id",
+        "num_parts",
+        "img_url"
+      ],
+      "rows": 28119,
+      "sha256": "9b56cd91f10ccaf6d1b823427325832d7a976c4fcded6e4d6802732e1ff7dbb0",
+      "url": "https://cdn.rebrickable.com/media/downloads/sets.csv.gz"
+    },
+    {
+      "bytes": 301232,
+      "dataset": "minifigs",
+      "filename": "minifigs.csv.gz",
+      "headers": [
+        "fig_num",
+        "name",
+        "num_parts",
+        "img_url"
+      ],
+      "rows": 17162,
+      "sha256": "60ead450df9e6157012dbdca36186fc5c6ac9c114d10d7be2f6af38055ddf7d6",
+      "url": "https://cdn.rebrickable.com/media/downloads/minifigs.csv.gz"
+    },
+    {
+      "bytes": 1125052,
+      "dataset": "elements",
+      "filename": "elements.csv.gz",
+      "headers": [
+        "element_id",
+        "part_num",
+        "color_id",
+        "design_id"
+      ],
+      "rows": 113831,
+      "sha256": "28e73e9348cf4eae48047dcbba496d6b71ca2d8848764fc11670d613282ccf32",
+      "url": "https://cdn.rebrickable.com/media/downloads/elements.csv.gz"
+    },
+    {
+      "bytes": 263339,
+      "dataset": "inventories",
+      "filename": "inventories.csv.gz",
+      "headers": [
+        "id",
+        "version",
+        "set_num"
+      ],
+      "rows": 47216,
+      "sha256": "a5f9c085a32d6e433397502343425062fea3587cdb87d1b671e16d1f103d7deb",
+      "url": "https://cdn.rebrickable.com/media/downloads/inventories.csv.gz"
+    },
+    {
+      "bytes": 14051053,
+      "dataset": "inventory_parts",
+      "filename": "inventory_parts.csv.gz",
+      "headers": [
+        "inventory_id",
+        "part_num",
+        "color_id",
+        "quantity",
+        "is_spare",
+        "img_url"
+      ],
+      "rows": 1551426,
+      "sha256": "a73e272f816826798973ec72b01bf2f8bca120571cd67cad8b3c2a5dc704f01c",
+      "url": "https://cdn.rebrickable.com/media/downloads/inventory_parts.csv.gz"
+    },
+    {
+      "bytes": 18898,
+      "dataset": "inventory_sets",
+      "filename": "inventory_sets.csv.gz",
+      "headers": [
+        "inventory_id",
+        "set_num",
+        "quantity"
+      ],
+      "rows": 5176,
+      "sha256": "a260844f665f5fe64675184fc01a93f78488548e51fbd7b2cc9dfdd7b7e5798b",
+      "url": "https://cdn.rebrickable.com/media/downloads/inventory_sets.csv.gz"
+    },
+    {
+      "bytes": 97665,
+      "dataset": "inventory_minifigs",
+      "filename": "inventory_minifigs.csv.gz",
+      "headers": [
+        "inventory_id",
+        "fig_num",
+        "quantity"
+      ],
+      "rows": 25738,
+      "sha256": "805be4a494c16fc4277f27693c503e3d2b2cbc21847f483954b244bb05109670",
+      "url": "https://cdn.rebrickable.com/media/downloads/inventory_minifigs.csv.gz"
+    },
+    {
+      "bytes": 194876,
+      "dataset": "part_relationships",
+      "filename": "part_relationships.csv.gz",
+      "headers": [
+        "rel_type",
+        "child_part_num",
+        "parent_part_num"
+      ],
+      "rows": 37210,
+      "sha256": "e0b73872cdc5fa1f6e5a54efeed7fb2850be3d58cded02a17e4665b9600a61da",
+      "url": "https://cdn.rebrickable.com/media/downloads/part_relationships.csv.gz"
+    }
+  ],
+  "source": "REBRICKABLE",
+  "started_at_utc": "2026-08-25T12:00:58.074073+00:00"
+}

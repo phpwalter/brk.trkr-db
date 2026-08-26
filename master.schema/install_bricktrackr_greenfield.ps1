@@ -3,7 +3,7 @@
 #    -ForceRecreate
 
 
-[CmdletBinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
+[CmdletBinding()]
 param(
     [string]$RepoRoot = "L:\var\www\Brk.Trkr\brk.trkr-db\master.schema",
     [string]$HostName = "localhost",
@@ -18,9 +18,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Hardcoded PostgreSQL credential, per request.
-$PostgresPassword = "root"
-$env:PGPASSWORD = $PostgresPassword
+# Password must be supplied by the caller through the process environment.
+# The GUI sets PGPASSWORD after prompting the user. This script never prompts
+# interactively and never stores a password.
+if ([string]::IsNullOrWhiteSpace($env:PGPASSWORD)) {
+    throw "PGPASSWORD is not set. Supply the PostgreSQL admin password through the calling process environment."
+}
+
 $env:PGUSER = $AdminUser
 
 function Invoke-Native {
@@ -49,6 +53,7 @@ try {
     $escapedDb = $Database.Replace("'", "''")
 
     $catalogArgs = @(
+        "--no-password",
         "-h", $HostName,
         "-p", "$Port",
         "-U", $AdminUser,
@@ -68,36 +73,35 @@ try {
             throw "Database '$Database' already exists. Re-run with -ForceRecreate only if this database is disposable."
         }
 
-        if ($PSCmdlet.ShouldProcess($Database, "DROP DATABASE WITH FORCE")) {
-            Write-Host "==> Dropping existing database '$Database'"
-
-            Invoke-Native -FilePath $PsqlExe -Arguments @(
-                "-h", $HostName,
-                "-p", "$Port",
-                "-U", $AdminUser,
-                "-d", "postgres",
-                "-v", "ON_ERROR_STOP=1",
-                "-c", "DROP DATABASE ""$Database"" WITH (FORCE);"
-            )
-        }
-    }
-
-    if ($PSCmdlet.ShouldProcess($Database, "CREATE DATABASE UTF8 from template0")) {
-        Write-Host "==> Creating clean database '$Database'"
+        Write-Host "==> Dropping existing database '$Database'"
 
         Invoke-Native -FilePath $PsqlExe -Arguments @(
+            "--no-password",
             "-h", $HostName,
             "-p", "$Port",
             "-U", $AdminUser,
             "-d", "postgres",
             "-v", "ON_ERROR_STOP=1",
-            "-c", "CREATE DATABASE ""$Database"" WITH TEMPLATE template0 ENCODING 'UTF8';"
+            "-c", "DROP DATABASE ""$Database"" WITH (FORCE);"
         )
     }
+
+    Write-Host "==> Creating clean database '$Database'"
+
+    Invoke-Native -FilePath $PsqlExe -Arguments @(
+        "--no-password",
+        "-h", $HostName,
+        "-p", "$Port",
+        "-U", $AdminUser,
+        "-d", "postgres",
+        "-v", "ON_ERROR_STOP=1",
+        "-c", "CREATE DATABASE ""$Database"" WITH TEMPLATE template0 ENCODING 'UTF8';"
+    )
 
     Write-Host "==> Bootstrapping BrickTrackr schema"
 
     Invoke-Native -FilePath $PsqlExe -Arguments @(
+        "--no-password",
         "-h", $HostName,
         "-p", "$Port",
         "-U", $AdminUser,
@@ -134,6 +138,7 @@ SELECT
 "@
 
     Invoke-Native -FilePath $PsqlExe -Arguments @(
+        "--no-password",
         "-h", $HostName,
         "-p", "$Port",
         "-U", $AdminUser,

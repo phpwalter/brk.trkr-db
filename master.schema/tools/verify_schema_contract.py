@@ -27,6 +27,27 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
 
+
+def verifier_python() -> str:
+    """Return console Python for CLI verifier subprocesses."""
+    exe = Path(sys.executable)
+
+    if os.name == "nt" and exe.name.lower() == "pythonw.exe":
+        sibling = exe.with_name("python.exe")
+        if sibling.is_file():
+            return str(sibling)
+
+        found = shutil.which("python.exe")
+        if found:
+            return found
+
+        raise RuntimeError(
+            "python.exe is required for schema verifier subprocesses "
+            "but could not be found"
+        )
+
+    return str(exe)
+
 STATIC_CHECKS = (
     "verify_dependencies.py",
     "verify_api_surface.py",
@@ -55,15 +76,27 @@ def run(cmd: list[str], *, cwd: Path = ROOT, env: dict | None = None,
             display.append("<DSN>")
         else:
             display.append(item)
+
     print("+", " ".join(display), flush=True)
-    return subprocess.run(
-        cmd,
-        cwd=str(cwd),
-        env=env,
-        text=True,
-        capture_output=capture,
-        check=False,
-    )
+
+    kwargs = {
+        "cwd": str(cwd),
+        "env": env,
+        "stdin": subprocess.DEVNULL,
+        "text": True,
+        "check": False,
+    }
+
+    # The GUI is launched with pythonw.exe. Every verifier/psql child must remain
+    # hidden too, otherwise Windows flashes a console for each subprocess.
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    if capture:
+        kwargs["stdout"] = subprocess.PIPE
+        kwargs["stderr"] = subprocess.PIPE
+
+    return subprocess.run(cmd, **kwargs)
 
 def require_tool(name: str) -> str:
     path = shutil.which(name)
@@ -73,19 +106,37 @@ def require_tool(name: str) -> str:
 
 def run_static() -> None:
     print("\n=== STATIC SCHEMA CONTRACT ===", flush=True)
+    print(f"[STATIC] child interpreter: {verifier_python()}", flush=True)
+
     missing = [name for name in STATIC_CHECKS if not (TOOLS / name).is_file()]
     if missing:
-        raise RuntimeError(f"required verifier(s) missing: {', '.join(missing)}")
+        raise RuntimeError(
+            f"required verifier(s) missing: {', '.join(missing)}"
+        )
 
     for name in STATIC_CHECKS:
         print(f"\n[STATIC] {name}", flush=True)
-        cp = run([sys.executable, str(TOOLS / name)])
+
+        cp = run(
+            [verifier_python(), str(TOOLS / name)],
+            capture=True,
+        )
+
+        if cp.stdout:
+            print(cp.stdout, end="", flush=True)
+
+        if cp.stderr:
+            print(cp.stderr, end="", file=sys.stderr, flush=True)
+
         if cp.returncode != 0:
-            raise RuntimeError(f"static verifier failed: {name}")
+            raise RuntimeError(
+                f"static verifier failed: {name} "
+                f"(exit code {cp.returncode})"
+            )
 
 def scalar_psql(psql: str, dsn: str, sql: str) -> str:
     cp = run(
-        [psql, "-X", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1",
+        [psql, "-X", "--no-password", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1",
          "--dbname", dsn, "--command", sql],
         capture=True,
     )
@@ -117,7 +168,7 @@ def bootstrap_database(psql: str, dsn: str) -> None:
     assert_disposable_clean_database(psql, dsn)
 
     cp = run([
-        psql, "-X", "-v", "ON_ERROR_STOP=1",
+        psql, "-X", "--no-password", "-v", "ON_ERROR_STOP=1",
         "--dbname", dsn,
         "--file", str(ROOT / "bootstrap.sql"),
     ])
@@ -137,7 +188,7 @@ def bootstrap_database(psql: str, dsn: str) -> None:
 def run_query_plans(psql: str, dsn: str) -> None:
     print("\n=== QUERY-PLAN CONTRACT ===", flush=True)
     cp = run([
-        psql, "-X", "-v", "ON_ERROR_STOP=1",
+        psql, "-X", "--no-password", "-v", "ON_ERROR_STOP=1",
         "--dbname", dsn,
         "--file", str(TOOLS / "verify_query_plans.psql"),
     ])
@@ -147,7 +198,7 @@ def run_query_plans(psql: str, dsn: str) -> None:
 def run_pgbouncer(psql: str, dsn: str) -> None:
     print("\n=== PGBOUNCER TRANSACTION-CONTEXT CONTRACT ===", flush=True)
     cp = run([
-        psql, "-X", "-v", "ON_ERROR_STOP=1",
+        psql, "-X", "--no-password", "-v", "ON_ERROR_STOP=1",
         "--dbname", dsn,
         "--file", str(TOOLS / "verify_pgbouncer_transaction_context.psql"),
     ])
