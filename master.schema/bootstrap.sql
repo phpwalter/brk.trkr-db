@@ -148,6 +148,7 @@
 \ir 0400_definitions/0404_definition_authority.sql
 \ir 0400_definitions/0405_manifest_graph.sql
 \ir 0400_definitions/0406_minifig_compositions.sql
+\ir 0400_definitions/0410_set_manifest_components.sql
 \ir 1200_validation/1204_definition_validation.sql
 \ir 0500_collections/0500_storage_locations.sql
 \ir 0500_collections/0501_collection_entries.sql
@@ -221,6 +222,10 @@
 \ir 1100_security/1109_rls_extended.sql
 \ir 1100_security/1107_grants.sql
 \ir 1100_security/1110_api_surface_lockdown.sql
+\ir 1000_reporting/1010_reporting_system_summary.sql
+\ir 1000_reporting/1011_reporting_aggregate_tables.sql
+\ir 5000_function/5000_importer/5030_importer_set_manifest_enrichment.sql
+\ir 5000_function/5400_reporting/5410_reporting_set_manifest_enrichment.sql
 \ir 1100_security/1111_role_ownership_separation.sql
 \ir 1100_security/1112_admin_execute_only.sql
 \ir 1200_validation/1211_security_validation.sql
@@ -235,10 +240,14 @@
 \ir 1200_validation/1221_operational_integrity_validation.sql
 \ir 1200_validation/1222_role_separation_validation.sql
 \ir 1200_validation/1223_admin_catalog_lifecycle_validation.sql
+\ir 1200_validation/1224_system_summary_validation.sql
+\ir 1200_validation/1225_aggregate_tables_validation.sql
+\ir 1200_validation/1226_set_manifest_enrichment_validation.sql
 \ir 5000_function/5900_tests/5900_test_importer_common.sql
 \ir 5000_function/5900_tests/5901_test_rebrickable_reference_reconcile.sql
 \ir 5000_function/5900_tests/5902_test_rebrickable_catalog_reconcile.sql
 \ir 5000_function/5900_tests/5903_test_fail_source_run.sql
+\ir 5000_function/5900_tests/5904_test_set_manifest_enrichment.sql
 \ir 5000_function/5900_tests/5910_test_admin_common.sql
 \ir 5000_function/5900_tests/5911_test_admin_catalog_lifecycle.sql
 \ir 5000_function/5900_tests/5912_test_admin_definition_graph.sql
@@ -255,4 +264,6 @@
 \ir 5000_function/5900_tests/5977_test_system_audit.sql
 \ir 5000_function/5900_tests/5978_test_system_integrity.sql
 \ir 5000_function/5900_tests/5979_test_system_request_context.sql
+\ir 5000_function/5900_tests/5980_test_system_summary.sql
+\ir 5000_function/5900_tests/5981_test_aggregate_tables.sql
 \ir 1200_validation/1213_dependency_validation.sql

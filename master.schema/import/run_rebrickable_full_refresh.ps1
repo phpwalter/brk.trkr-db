@@ -92,9 +92,21 @@ function Invoke-PsqlScalar {
         "-c", $Sql
     )
 
-    $output = & $PsqlExe @args 2>&1
+    # Windows PowerShell can promote native stderr (including harmless
+    # PostgreSQL NOTICE/WARNING messages) into terminating errors when the
+    # script-level ErrorActionPreference is Stop.  The native psql exit code is
+    # the authoritative success/failure signal here.
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $output = & $PsqlExe @args 2>&1
+        $psqlExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
 
-    if ($LASTEXITCODE -ne 0) {
+    if ($psqlExitCode -ne 0) {
         throw "psql failed: $($output -join [Environment]::NewLine)"
     }
 

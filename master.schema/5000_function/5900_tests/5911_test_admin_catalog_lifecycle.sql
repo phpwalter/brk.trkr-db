@@ -279,13 +279,20 @@ BEGIN
         '5911 audit metadata test'
     );
 
+    /*
+     * Select the exact lifecycle event by its unique test reason.
+     *
+     * Do not infer insertion order from occurred_at/audit_event_id:
+     * occurred_at uses transaction-stable time and UUIDv7 does not guarantee
+     * total ordering for multiple events created in the same timestamp window.
+     */
     SELECT e.audit_event_id, e.metadata
       INTO v_event_id, v_metadata
       FROM audit.events e
      WHERE e.entity_schema = 'catalog'
        AND e.entity_table = 'items'
        AND e.entity_id = v_other_id::text
-     ORDER BY e.occurred_at DESC, e.audit_event_id DESC
+       AND e.metadata ->> 'reason' = '5911 audit metadata test'
      LIMIT 1;
 
     PERFORM app.assert_true(v_event_id IS NOT NULL,
