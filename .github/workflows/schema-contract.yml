@@ -1,0 +1,18 @@
+name: Schema Contract
+
+on:
+  push:
+    branches: [foundation]
+  pull_request:
+    branches: [foundation]
+
+jobs:
+  static-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify dependency contract
+        run: python master.schema/tools/verify_dependencies.py
