@@ -8,22 +8,8 @@
                  reads, notifications and collection transfers.
  Depends On:     catalog.item_search
                  catalog.items
-                 catalog.sets
-                 catalog.parts
-                 catalog.part_variants
-                 catalog.external_identifiers
                  catalog.item_images
-                 catalog.item_relationships
                  catalog.instruction_assets
-                 reference.external_sources
-                 reference.themes
-                 definition.inventory_definitions
-                 definition.inventory_versions
-                 definition.requirement_groups
-                 definition.requirement_options
-                 definition.definition_authority
-                 definition.effective_inventory_version(uuid)
-                 marketplace.market_price_observations
                  operations.notifications
                  collection.transfers
                  collection.entries
@@ -31,12 +17,11 @@
                  collection.entry_tags
                  wanted.build_allocations
                  identity.current_user_id()
-                 identity.can_view_owner()
                  identity.can_manage_owner()
 ===============================================================================
 */
 \set ON_ERROR_STOP on
-SELECT pg_temp.bt_preflight('5000_function/5200_api/5210_api_operational.sql', ARRAY['catalog.item_search', 'catalog.items', 'catalog.sets', 'catalog.parts', 'catalog.part_variants', 'catalog.external_identifiers', 'catalog.item_images', 'catalog.item_relationships', 'catalog.instruction_assets', 'reference.external_sources', 'reference.themes', 'definition.inventory_definitions', 'definition.inventory_versions', 'definition.requirement_groups', 'definition.requirement_options', 'definition.definition_authority', 'definition.effective_inventory_version(uuid)', 'marketplace.market_price_observations', 'operations.notifications', 'collection.transfers', 'collection.entries', 'collection.storage_allocations', 'collection.entry_tags', 'wanted.build_allocations', 'identity.current_user_id()', 'identity.can_view_owner()', 'identity.can_manage_owner()']::text[]);
+SELECT pg_temp.bt_preflight('5000_function/5200_api/5210_api_operational.sql', ARRAY['catalog.item_search', 'catalog.items', 'catalog.item_images', 'catalog.instruction_assets', 'operations.notifications', 'collection.transfers', 'collection.entries', 'collection.storage_allocations', 'collection.entry_tags', 'wanted.build_allocations', 'identity.current_user_id()', 'identity.can_manage_owner()']::text[]);
 
 CREATE OR REPLACE FUNCTION api.search_catalog(
     p_query text,
@@ -486,7 +471,7 @@ AS $$
     ), used AS (
         SELECT DISTINCT si.item_num, si.canonical_name
         FROM part_target pt
-        JOIN catalog.part_variants pv
+        LEFT JOIN catalog.part_variants pv
           ON pv.part_catalog_item_id = pt.catalog_item_id
         JOIN definition.requirement_options o
           ON o.catalog_item_id = pt.catalog_item_id
@@ -827,7 +812,6 @@ BEGIN
 END;
 $$;
 
-/* SECURITY DEFINER routines are private until 1110_api_surface_lockdown.sql grants exact signatures. */
 REVOKE EXECUTE ON FUNCTION api.search_catalog_public(text,text,integer) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION api.get_catalog_item_by_item_num(text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION api.get_set_by_item_num(text) FROM PUBLIC;
