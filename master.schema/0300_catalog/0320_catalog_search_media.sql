@@ -8,7 +8,6 @@
                  public-source identity assignment, and indexed PostgreSQL
                  text-search projections.
  Depends On:     catalog.items
-                 catalog.external_identifiers
                  reference.external_sources
                  pg_trgm
  Creates:        catalog.barcode_type
@@ -92,9 +91,9 @@ CREATE INDEX ix_item_relationships_to
     ON catalog.item_relationships(to_catalog_item_id, relationship_kind);
 
 /*
- * Public catalog identity is independent from the UUID primary key.  Canonical
+ * Public catalog identity is independent from the UUID primary key. Canonical
  * imported SET/PART/MINIFIGURE rows adopt the stable Rebrickable external ID as
- * their initial BrickTrackr item_num.  Once assigned, item_num is never changed
+ * their initial BrickTrackr item_num. Once assigned, item_num is never changed
  * by later source remapping.
  */
 CREATE OR REPLACE FUNCTION catalog.trg_assign_public_item_num()
@@ -146,7 +145,6 @@ ON catalog.external_identifiers
 FOR EACH ROW
 EXECUTE FUNCTION catalog.trg_assign_public_item_num();
 
-/* Backfill databases where source mappings predate the public identity field. */
 WITH preferred AS (
     SELECT
         ei.catalog_item_id,
