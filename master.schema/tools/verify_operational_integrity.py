@@ -6,6 +6,80 @@ import re, sys
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "1200_validation" / "1221_operational_integrity_validation.sql"
 
+
+def strip_sql_non_code(text: str) -> str:
+    """Strip SQL comments and quoted literals, preserving structure/newlines."""
+    out = []
+    i = 0
+    n = len(text)
+
+    while i < n:
+        if text.startswith("--", i):
+            out.extend("  ")
+            i += 2
+            while i < n and text[i] != "\n":
+                out.append(" ")
+                i += 1
+            continue
+
+        if text.startswith("/*", i):
+            out.extend("  ")
+            i += 2
+            depth = 1
+            while i < n and depth > 0:
+                if text.startswith("/*", i):
+                    out.extend("  ")
+                    i += 2
+                    depth += 1
+                elif text.startswith("*/", i):
+                    out.extend("  ")
+                    i += 2
+                    depth -= 1
+                else:
+                    out.append("\n" if text[i] == "\n" else " ")
+                    i += 1
+            continue
+
+        if text[i] == "'":
+            out.append(" ")
+            i += 1
+            while i < n:
+                if text[i] == "'":
+                    if i + 1 < n and text[i + 1] == "'":
+                        out.extend("  ")
+                        i += 2
+                        continue
+                    out.append(" ")
+                    i += 1
+                    break
+                out.append("\n" if text[i] == "\n" else " ")
+                i += 1
+            continue
+
+        if text[i] == "$":
+            match = re.match(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$", text[i:])
+            if match:
+                tag = match.group(0)
+                out.extend(" " * len(tag))
+                i += len(tag)
+                end = text.find(tag, i)
+                if end == -1:
+                    while i < n:
+                        out.append("\n" if text[i] == "\n" else " ")
+                        i += 1
+                    continue
+                while i < end:
+                    out.append("\n" if text[i] == "\n" else " ")
+                    i += 1
+                out.extend(" " * len(tag))
+                i += len(tag)
+                continue
+
+        out.append(text[i])
+        i += 1
+
+    return "".join(out)
+
 def main() -> int:
     errors = []
     validator = VALIDATOR.read_text()
@@ -46,9 +120,10 @@ def main() -> int:
         if "migrations" in rel.parts or "1200_validation" in rel.parts:
             continue
         text = p.read_text()
-        if re.search(r"\bNOT\s+VALID\b", text, re.I):
+        code_text = strip_sql_non_code(text)
+        if re.search(r"\bNOT\s+VALID\b", code_text, re.I):
             errors.append(f"{rel}: NOT VALID constraint is forbidden in master bootstrap")
-        if re.search(r"\bCREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY\b", text, re.I):
+        if re.search(r"\bCREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY\b", code_text, re.I):
             errors.append(
                 f"{rel}: CREATE INDEX CONCURRENTLY is incompatible with atomic bootstrap"
             )

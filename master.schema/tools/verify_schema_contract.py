@@ -2,16 +2,9 @@
 """Single BrickTrackr schema-contract CI entrypoint.
 
 Runs all source-level verifiers, optionally bootstraps a disposable clean
-PostgreSQL database (which itself executes all install-time/catalog/adversarial
-validators), and optionally executes production-equivalent query-plan and
-PgBouncer transaction-pooling checks.
-
-Examples:
-  python tools/verify_schema_contract.py
-  python tools/verify_schema_contract.py --database "$CI_DATABASE_URL"
-  python tools/verify_schema_contract.py --database "$CI_DATABASE_URL" --query-plans
-  python tools/verify_schema_contract.py --database "$CI_DATABASE_URL" \
-      --query-plans --pgbouncer-database "$CI_PGBOUNCER_URL"
+PostgreSQL database, optionally executes production-equivalent query-plan
+checks, and optionally executes the real PgBouncer transaction-pooling
+request-context contract.
 """
 from __future__ import annotations
 
@@ -27,27 +20,6 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
 
-
-def verifier_python() -> str:
-    """Return console Python for CLI verifier subprocesses."""
-    exe = Path(sys.executable)
-
-    if os.name == "nt" and exe.name.lower() == "pythonw.exe":
-        sibling = exe.with_name("python.exe")
-        if sibling.is_file():
-            return str(sibling)
-
-        found = shutil.which("python.exe")
-        if found:
-            return found
-
-        raise RuntimeError(
-            "python.exe is required for schema verifier subprocesses "
-            "but could not be found"
-        )
-
-    return str(exe)
-
 STATIC_CHECKS = (
     "verify_dependencies.py",
     "verify_api_surface.py",
@@ -55,6 +27,7 @@ STATIC_CHECKS = (
     "verify_financial_readiness.py",
     "verify_operational_integrity.py",
     "verify_role_separation.py",
+    "verify_transaction_context.py",
 )
 
 APP_SCHEMAS = (
@@ -76,27 +49,15 @@ def run(cmd: list[str], *, cwd: Path = ROOT, env: dict | None = None,
             display.append("<DSN>")
         else:
             display.append(item)
-
     print("+", " ".join(display), flush=True)
-
-    kwargs = {
-        "cwd": str(cwd),
-        "env": env,
-        "stdin": subprocess.DEVNULL,
-        "text": True,
-        "check": False,
-    }
-
-    # The GUI is launched with pythonw.exe. Every verifier/psql child must remain
-    # hidden too, otherwise Windows flashes a console for each subprocess.
-    if os.name == "nt":
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-
-    if capture:
-        kwargs["stdout"] = subprocess.PIPE
-        kwargs["stderr"] = subprocess.PIPE
-
-    return subprocess.run(cmd, **kwargs)
+    return subprocess.run(
+        cmd,
+        cwd=str(cwd),
+        env=env,
+        text=True,
+        capture_output=capture,
+        check=False,
+    )
 
 def require_tool(name: str) -> str:
     path = shutil.which(name)
@@ -106,37 +67,19 @@ def require_tool(name: str) -> str:
 
 def run_static() -> None:
     print("\n=== STATIC SCHEMA CONTRACT ===", flush=True)
-    print(f"[STATIC] child interpreter: {verifier_python()}", flush=True)
-
     missing = [name for name in STATIC_CHECKS if not (TOOLS / name).is_file()]
     if missing:
-        raise RuntimeError(
-            f"required verifier(s) missing: {', '.join(missing)}"
-        )
+        raise RuntimeError(f"required verifier(s) missing: {', '.join(missing)}")
 
     for name in STATIC_CHECKS:
         print(f"\n[STATIC] {name}", flush=True)
-
-        cp = run(
-            [verifier_python(), str(TOOLS / name)],
-            capture=True,
-        )
-
-        if cp.stdout:
-            print(cp.stdout, end="", flush=True)
-
-        if cp.stderr:
-            print(cp.stderr, end="", file=sys.stderr, flush=True)
-
+        cp = run([sys.executable, str(TOOLS / name)])
         if cp.returncode != 0:
-            raise RuntimeError(
-                f"static verifier failed: {name} "
-                f"(exit code {cp.returncode})"
-            )
+            raise RuntimeError(f"static verifier failed: {name}")
 
 def scalar_psql(psql: str, dsn: str, sql: str) -> str:
     cp = run(
-        [psql, "-X", "--no-password", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1",
+        [psql, "-X", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1",
          "--dbname", dsn, "--command", sql],
         capture=True,
     )
@@ -168,7 +111,7 @@ def bootstrap_database(psql: str, dsn: str) -> None:
     assert_disposable_clean_database(psql, dsn)
 
     cp = run([
-        psql, "-X", "--no-password", "-v", "ON_ERROR_STOP=1",
+        psql, "-X", "-v", "ON_ERROR_STOP=1",
         "--dbname", dsn,
         "--file", str(ROOT / "bootstrap.sql"),
     ])
@@ -188,17 +131,18 @@ def bootstrap_database(psql: str, dsn: str) -> None:
 def run_query_plans(psql: str, dsn: str) -> None:
     print("\n=== QUERY-PLAN CONTRACT ===", flush=True)
     cp = run([
-        psql, "-X", "--no-password", "-v", "ON_ERROR_STOP=1",
+        psql, "-X", "-v", "ON_ERROR_STOP=1",
         "--dbname", dsn,
         "--file", str(TOOLS / "verify_query_plans.psql"),
     ])
     if cp.returncode != 0:
         raise RuntimeError("query-plan contract failed")
 
-def run_pgbouncer(psql: str, dsn: str) -> None:
+def run_pgbouncer(psql: str, dsn: str, user_id: str) -> None:
     print("\n=== PGBOUNCER TRANSACTION-CONTEXT CONTRACT ===", flush=True)
     cp = run([
-        psql, "-X", "--no-password", "-v", "ON_ERROR_STOP=1",
+        psql, "-X", "-v", "ON_ERROR_STOP=1",
+        "-v", f"user_id={user_id}",
         "--dbname", dsn,
         "--file", str(TOOLS / "verify_pgbouncer_transaction_context.psql"),
     ])
@@ -230,8 +174,16 @@ def parse_args() -> argparse.Namespace:
         "--pgbouncer-database",
         default=os.environ.get("BRICKTRACKR_PGBOUNCER_URL"),
         help=(
-            "PgBouncer transaction-pooling DSN using the API runtime role. "
+            "PgBouncer transaction-pooling DSN using the brktrkr_api login. "
             "Defaults to BRICKTRACKR_PGBOUNCER_URL."
+        ),
+    )
+    p.add_argument(
+        "--pgbouncer-user-id",
+        default=os.environ.get("BRICKTRACKR_PGBOUNCER_TEST_USER_ID"),
+        help=(
+            "Existing BrickTrackr user UUID used by the PgBouncer USER-context "
+            "test. Defaults to BRICKTRACKR_PGBOUNCER_TEST_USER_ID."
         ),
     )
     p.add_argument(
@@ -256,7 +208,7 @@ def main() -> int:
     started = time.time()
     result = {
         "contract": "bricktrackr-schema-contract",
-        "contract_version": 1,
+        "contract_version": 2,
         "static": "not-run",
         "bootstrap": "not-run",
         "query_plans": "not-run",
@@ -284,6 +236,11 @@ def main() -> int:
             raise RuntimeError(
                 "--require-pgbouncer was specified but no PgBouncer DSN was supplied"
             )
+        if args.pgbouncer_database and not args.pgbouncer_user_id:
+            raise RuntimeError(
+                "--pgbouncer-database requires --pgbouncer-user-id or "
+                "BRICKTRACKR_PGBOUNCER_TEST_USER_ID"
+            )
 
         if args.database or args.pgbouncer_database:
             psql = require_tool("psql")
@@ -298,7 +255,7 @@ def main() -> int:
                 result["query_plans"] = "passed"
 
         if args.pgbouncer_database:
-            run_pgbouncer(psql, args.pgbouncer_database)
+            run_pgbouncer(psql, args.pgbouncer_database, args.pgbouncer_user_id)
             result["pgbouncer"] = "passed"
 
         result["status"] = "passed"

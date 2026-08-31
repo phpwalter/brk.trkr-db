@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.1",
+  "parser_version": "2.0-visible-booklets",
+  "source": "LEGO",
+  "release_year": 2025,
+  "generated_at": "2026-08-28T22:24:41.930700+00:00",
+  "updated_at": "2026-08-29T21:44:35.489204+00:00",
+  "sets": [
+    {
+      "set_number": "88021",
+      "bricktrackr_release_year": 2025,
+      "bricktrackr_canonical_name": "Rechargeable Battery",
+      "lego_url": "https://www.lego.com/en-us/service/building-instructions/88021",
+      "found": false,
+      "status": "ACCESS_DENIED",
+      "http_status": 403,
+      "checked_at": "2026-08-28T22:24:43.691373+00:00",
+      "parser_version": "2.0-visible-booklets",
+      "instructions": []
+    },
+    {
+      "set_number": "80119",
+      "bricktrackr_release_year": 2025,
+      "bricktrackr_canonical_name": "Galloping Horse Canvas",
+      "lego_url": "https://www.lego.com/en-us/service/building-instructions/80119",
+      "found": false,
+      "status": "ACCESS_DENIED",
+      "http_status": 403,
+      "checked_at": "2026-08-29T21:44:35.489124+00:00",
+      "parser_version": "2.0-visible-booklets",
+      "instructions": []
+    },
+    {
+      "set_number": "77250",
+      "bricktrackr_release_year": 2025,
+      "bricktrackr_canonical_name": "MoneyGram Haas F1 Team VF-24 Race Car",
+      "lego_url": "https://www.lego.com/en-us/service/building-instructions/77250",
+      "found": true,
+      "status": "FOUND",
+      "http_status": 200,
+      "checked_at": "2026-08-28T22:30:20.086332+00:00",
+      "parser_version": "2.0-visible-booklets",
+      "instructions": [
+        {
+          "instruction_id": "77250:booklet:1-of-1",
+          "booklet_number": 1,
+          "booklet_count": 1,
+          "label": "1/1",
+          "document_id": "6566106",
+          "pdf_url": "https://www.lego.com/cdn/product-assets/product.bi.core.pdf/6566106.pdf",
+          "pdf_variants": [
+            "https://www.lego.com/cdn/product-assets/product.bi.core.pdf/6566106.pdf",
+            "https://www.lego.com/cdn/cs/sustainability/assets/blt9a710d74374d6565/LEGO_Modern_Slavery_Statement_2025_Approved_for_upload.pdf"
+          ],
+          "language": null
+        }
+      ]
+    }
+  ]
+}

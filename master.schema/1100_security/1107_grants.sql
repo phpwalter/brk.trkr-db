@@ -77,7 +77,7 @@ GRANT USAGE ON SCHEMA
     moc,
     import,
     api
-TO lego_app;
+TO brktrkr_api;
 
 /* Public/reference catalog data is filtered by catalog/definition RLS where
  * owner-private unresolved items are involved. */
@@ -86,7 +86,7 @@ ON ALL TABLES IN SCHEMA
     reference,
     catalog,
     definition
-TO lego_app;
+TO brktrkr_api;
 
 /* Collection DML. Transfer history is intentionally INSERT + SELECT only. */
 GRANT SELECT, INSERT, UPDATE, DELETE
@@ -100,21 +100,21 @@ ON
     collection.acquisition_items,
     collection.tags,
     collection.entry_tags
-TO lego_app;
+TO brktrkr_api;
 
 GRANT SELECT, INSERT
 ON collection.transfers
-TO lego_app;
+TO brktrkr_api;
 
 /* Wanted/build-goal DML. */
 GRANT SELECT, INSERT, UPDATE, DELETE
 ON ALL TABLES IN SCHEMA wanted
-TO lego_app;
+TO brktrkr_api;
 
 /* MOC DML; RLS and immutability triggers narrow it further. */
 GRANT SELECT, INSERT, UPDATE, DELETE
 ON ALL TABLES IN SCHEMA moc
-TO lego_app;
+TO brktrkr_api;
 
 /* Authentication resources only; ordinary user/profile tables are not exposed. */
 GRANT SELECT, INSERT, UPDATE, DELETE
@@ -122,7 +122,7 @@ ON
     identity.user_credentials,
     identity.user_sessions,
     identity.one_time_tokens
-TO lego_app;
+TO brktrkr_api;
 
 /* User-facing imports only. Authoritative source-run tables remain importer-only. */
 GRANT SELECT, INSERT, UPDATE, DELETE
@@ -134,12 +134,12 @@ ON
     import.user_mapping_suggestions,
     import.applications,
     import.application_changes
-TO lego_app;
+TO brktrkr_api;
 
 
 /* Runtime function surface required by defaults, RLS, and read helpers. */
 GRANT EXECUTE ON FUNCTION app.uuid_v7()
-TO lego_app;
+TO brktrkr_api;
 
 GRANT EXECUTE ON FUNCTION
     identity.current_user_id(),
@@ -149,7 +149,7 @@ GRANT EXECUTE ON FUNCTION
     identity.can_manage_owner(uuid, uuid, text),
     identity.can_view_family_shared_owner(uuid, uuid, text),
     identity.can_transfer_between(uuid, uuid, uuid)
-TO lego_app;
+TO brktrkr_api;
 
 GRANT EXECUTE ON FUNCTION
     definition.effective_inventory_version(uuid),
@@ -161,7 +161,7 @@ GRANT EXECUTE ON FUNCTION
     api.get_moc_assets(uuid, uuid),
     api.get_moc_licenses(uuid, uuid),
     api.get_moc_subassemblies(uuid, uuid)
-TO lego_app;
+TO brktrkr_api;
 
 
 /* Application sequences used by identity-backed bigint tables. */
@@ -170,7 +170,7 @@ ON ALL SEQUENCES IN SCHEMA
     collection,
     wanted,
     import
-TO lego_app;
+TO brktrkr_api;
 
 
 /* ==========================================================================
@@ -189,7 +189,7 @@ GRANT USAGE ON SCHEMA
     import,
     audit,
     api
-TO lego_admin;
+TO brktrkr_admin;
 
 GRANT ALL PRIVILEGES
 ON ALL TABLES IN SCHEMA
@@ -202,7 +202,7 @@ ON ALL TABLES IN SCHEMA
     moc,
     import,
     audit
-TO lego_admin;
+TO brktrkr_admin;
 
 GRANT USAGE, SELECT
 ON ALL SEQUENCES IN SCHEMA
@@ -213,7 +213,7 @@ ON ALL SEQUENCES IN SCHEMA
     wanted,
     import,
     audit
-TO lego_admin;
+TO brktrkr_admin;
 
 GRANT EXECUTE
 ON ALL FUNCTIONS IN SCHEMA
@@ -228,14 +228,14 @@ ON ALL FUNCTIONS IN SCHEMA
     import,
     audit,
     api
-TO lego_admin;
+TO brktrkr_admin;
 
 
 /* ==========================================================================
  * Authoritative importer
  * ==========================================================================
  * Security contract:
- *   - lego_importer is a NOLOGIN capability role used only by dedicated
+ *   - brktrkr_import is a NOLOGIN capability role used only by dedicated
  *     import-service logins.
  *   - authoritative importers may stage/retry source data and maintain
  *     source-run provenance.
@@ -260,7 +260,7 @@ ON ALL TABLES IN SCHEMA
     finance,
     operations,
     reporting
-FROM lego_importer;
+FROM brktrkr_import;
 
 REVOKE ALL PRIVILEGES
 ON ALL SEQUENCES IN SCHEMA
@@ -274,7 +274,7 @@ ON ALL SEQUENCES IN SCHEMA
     finance,
     operations,
     reporting
-FROM lego_importer;
+FROM brktrkr_import;
 
 REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA
     reference,
@@ -287,26 +287,26 @@ REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA
     finance,
     operations,
     reporting
-FROM lego_importer;
+FROM brktrkr_import;
 
 /* Importer needs only these schemas for Phase-1 source-run staging. */
 GRANT USAGE ON SCHEMA
     app,
     reference,
     import
-TO lego_importer;
+TO brktrkr_import;
 
 /* Source registry lookup only. No canonical reference DML. */
 GRANT SELECT
 ON reference.external_sources
-TO lego_importer;
+TO brktrkr_import;
 
 /* Source-run lifecycle/provenance. */
 GRANT SELECT, INSERT, UPDATE
 ON
     import.source_runs,
     import.source_run_datasets
-TO lego_importer;
+TO brktrkr_import;
 
 /* Run-scoped authoritative staging.
  * DELETE is intentionally permitted only here so a failed/retried dataset can
@@ -314,18 +314,18 @@ TO lego_importer;
  */
 GRANT SELECT, INSERT, DELETE
 ON import.source_stage_records
-TO lego_importer;
+TO brktrkr_import;
 
 /* Identity sequences used by the staging/control tables. */
 GRANT USAGE, SELECT
 ON SEQUENCE
     import.source_run_datasets_source_run_dataset_id_seq,
     import.source_stage_records_source_stage_record_id_seq
-TO lego_importer;
+TO brktrkr_import;
 
 /* app.uuid_v7() is required by import.source_runs.source_run_id default. */
 GRANT EXECUTE ON FUNCTION app.uuid_v7()
-TO lego_importer;
+TO brktrkr_import;
 
 /* Deliberately no:
  *   GRANT ... ON ALL TABLES IN SCHEMA reference/catalog/definition
@@ -339,45 +339,37 @@ TO lego_importer;
 /* ==========================================================================
  * Controlled application API role (preferred runtime boundary)
  * ========================================================================== */
-GRANT USAGE ON SCHEMA api TO lego_api;
+GRANT USAGE ON SCHEMA api TO brktrkr_api;
 /* Runtime EXECUTE grants are applied from the reviewed allowlist in
  * 1110_api_surface_lockdown.sql. */
 
-/* No direct operational table privileges are granted to lego_api. */
-GRANT USAGE ON SCHEMA reporting TO lego_reporting;
-GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO lego_reporting;
+/* No direct operational table privileges are granted to brktrkr_api. */
+GRANT USAGE ON SCHEMA reporting TO brktrkr_reporting;
+GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO brktrkr_reporting;
 
 /* Administrators receive explicit access to the extended domains. */
-GRANT USAGE ON SCHEMA admin, marketplace, finance, operations, reporting TO lego_admin;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA marketplace, finance, operations TO lego_admin;
-GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO lego_admin;
-GRANT EXECUTE ON ALL ROUTINES IN SCHEMA admin, api TO lego_admin;
+GRANT USAGE ON SCHEMA admin, marketplace, finance, operations, reporting TO brktrkr_admin;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA marketplace, finance, operations TO brktrkr_admin;
+GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO brktrkr_admin;
+GRANT EXECUTE ON ALL ROUTINES IN SCHEMA admin, api TO brktrkr_admin;
 
 /* Importer may write source-attributed market observations, but not listings/orders/ledger. */
-GRANT USAGE ON SCHEMA marketplace TO lego_importer;
-GRANT SELECT, INSERT, UPDATE ON marketplace.market_price_observations TO lego_importer;
+GRANT USAGE ON SCHEMA marketplace TO brktrkr_import;
+GRANT SELECT, INSERT, UPDATE ON marketplace.market_price_observations TO brktrkr_import;
 
-/* Compatibility runtime may call the new safe API without direct access to new base tables. */
-GRANT USAGE ON SCHEMA api TO lego_app;
-/* Runtime EXECUTE grants are applied from the reviewed allowlist in
- * 1110_api_surface_lockdown.sql. */
-
-GRANT USAGE ON SCHEMA app TO lego_api;
-GRANT EXECUTE ON FUNCTION app.set_authenticated_user(uuid) TO lego_api;
-GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,text,text) TO lego_api;
+GRANT USAGE ON SCHEMA app TO brktrkr_api;
+GRANT EXECUTE ON FUNCTION app.set_authenticated_user(uuid) TO brktrkr_api;
+GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,text,text) TO brktrkr_api;
 
 
 /* ==========================================================================
  * Runtime execute-only hardening
  * ==========================================================================
  * Security contract:
- *   - lego_api is the preferred runtime group role.
- *   - lego_app is retained only as an execute-only compatibility group role.
- *   - neither role may directly read or mutate application relations.
+ *   - brktrkr_api is the sole application runtime capability role.
+ *   - brktrkr_api may not directly read or mutate application relations.
  *
- * These revokes intentionally override the historical direct-table grants
- * above. Keep this block until the legacy grants are removed in a dedicated
- * cleanup migration, so the effective privilege state remains safe.
+ * These revokes establish the deny-by-default direct-table runtime boundary.
  * ========================================================================== */
 
 REVOKE ALL PRIVILEGES
@@ -395,7 +387,7 @@ ON ALL TABLES IN SCHEMA
     finance,
     operations,
     reporting
-FROM lego_app;
+FROM brktrkr_api;
 
 REVOKE ALL PRIVILEGES
 ON ALL SEQUENCES IN SCHEMA
@@ -412,7 +404,7 @@ ON ALL SEQUENCES IN SCHEMA
     finance,
     operations,
     reporting
-FROM lego_app;
+FROM brktrkr_api;
 
 REVOKE USAGE ON SCHEMA
     identity,
@@ -429,7 +421,7 @@ REVOKE USAGE ON SCHEMA
     finance,
     operations,
     reporting
-FROM lego_app;
+FROM brktrkr_api;
 
 REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA
     app,
@@ -447,26 +439,26 @@ REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA
     finance,
     operations,
     reporting
-FROM lego_app;
+FROM brktrkr_api;
 
-/* Both runtime group roles expose only the reviewed API surface plus
+/* The runtime API role exposes only the reviewed API surface plus
  * non-authorizing request-correlation context. */
-GRANT USAGE ON SCHEMA api TO lego_api, lego_app;
+GRANT USAGE ON SCHEMA api TO brktrkr_api;
 /* Deliberately no GRANT EXECUTE ON ALL ROUTINES here.  The runtime callable
  * surface is granted explicitly by 1110_api_surface_lockdown.sql. */
 
-GRANT USAGE ON SCHEMA app TO lego_api, lego_app;
+GRANT USAGE ON SCHEMA app TO brktrkr_api;
 GRANT EXECUTE ON FUNCTION app.set_authenticated_user(uuid)
-TO lego_api, lego_app;
+TO brktrkr_api;
 
 GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,text,text)
-TO lego_api, lego_app;
+TO brktrkr_api;
 
 
 /* ==========================================================================
  * Rebrickable Phase 2 canonical reconciliation
  * ==========================================================================
- * lego_importer remains unable to modify canonical reference/catalog/
+ * brktrkr_import remains unable to modify canonical reference/catalog/
  * definition tables directly.  Reconciliation is exposed only through this
  * reviewed SECURITY DEFINER function.
  * ========================================================================== */
@@ -477,7 +469,7 @@ FROM PUBLIC;
 
 GRANT EXECUTE
 ON FUNCTION import.reconcile_rebrickable_reference(uuid)
-TO lego_importer;
+TO brktrkr_import;
 
 
 /* ==========================================================================
@@ -491,47 +483,47 @@ TO lego_importer;
  * Phase 2 / Phase 3:
  *   - canonical reconciliation only through reviewed SECURITY DEFINER routines
  *
- * lego_importer receives NO direct canonical DML on reference/catalog/definition.
+ * brktrkr_import receives NO direct canonical DML on reference/catalog/definition.
  * ========================================================================== */
 
 /* Remove any legacy broad canonical mutation rights first. */
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE
 ON ALL TABLES IN SCHEMA reference
-FROM lego_importer;
+FROM brktrkr_import;
 
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE
 ON ALL TABLES IN SCHEMA catalog
-FROM lego_importer;
+FROM brktrkr_import;
 
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE
 ON ALL TABLES IN SCHEMA definition
-FROM lego_importer;
+FROM brktrkr_import;
 
 /* Schema visibility required by the importer. */
-GRANT USAGE ON SCHEMA app TO lego_importer;
-GRANT USAGE ON SCHEMA reference TO lego_importer;
-GRANT USAGE ON SCHEMA import TO lego_importer;
+GRANT USAGE ON SCHEMA app TO brktrkr_import;
+GRANT USAGE ON SCHEMA reference TO brktrkr_import;
+GRANT USAGE ON SCHEMA import TO brktrkr_import;
 
 /* Phase 1 source/staging contract. */
 GRANT SELECT
 ON TABLE reference.external_sources
-TO lego_importer;
+TO brktrkr_import;
 
 GRANT SELECT, INSERT, UPDATE
 ON TABLE import.source_runs
-TO lego_importer;
+TO brktrkr_import;
 
 GRANT SELECT, INSERT, UPDATE
 ON TABLE import.source_run_datasets
-TO lego_importer;
+TO brktrkr_import;
 
 GRANT SELECT, INSERT, DELETE
 ON TABLE import.source_stage_records
-TO lego_importer;
+TO brktrkr_import;
 
 /* UUID helper used by importer-side source-run creation where required. */
 REVOKE ALL ON FUNCTION app.uuid_v7() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION app.uuid_v7() TO lego_importer;
+GRANT EXECUTE ON FUNCTION app.uuid_v7() TO brktrkr_import;
 
 /* Phase 2 reference reconciliation. */
 REVOKE ALL
@@ -540,12 +532,12 @@ FROM PUBLIC;
 
 GRANT EXECUTE
 ON FUNCTION import.reconcile_rebrickable_reference(uuid)
-TO lego_importer;
+TO brktrkr_import;
 
 /* Importer transaction-local provenance context. */
 REVOKE ALL ON FUNCTION app.set_import_context(uuid) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION app.set_import_context(uuid) FROM lego_api, lego_app;
-GRANT EXECUTE ON FUNCTION app.set_import_context(uuid) TO lego_importer;
+REVOKE EXECUTE ON FUNCTION app.set_import_context(uuid) FROM brktrkr_api;
+GRANT EXECUTE ON FUNCTION app.set_import_context(uuid) TO brktrkr_import;
 /* Phase 3B checkpointed catalog reconciliation. */
 REVOKE ALL
 ON FUNCTION import.phase3b_initialize(uuid, boolean)
@@ -561,22 +553,22 @@ FROM PUBLIC;
 
 GRANT EXECUTE
 ON FUNCTION import.phase3b_initialize(uuid, boolean)
-TO lego_importer;
+TO brktrkr_import;
 
 GRANT EXECUTE
 ON FUNCTION import.phase3b_run_checkpoint(uuid, text, text, integer)
-TO lego_importer;
+TO brktrkr_import;
 
 GRANT EXECUTE
 ON FUNCTION import.phase3b_progress(uuid)
-TO lego_importer;
+TO brktrkr_import;
 
 /* Importer may not create objects in application schemas. */
-REVOKE CREATE ON SCHEMA app FROM lego_importer;
-REVOKE CREATE ON SCHEMA reference FROM lego_importer;
-REVOKE CREATE ON SCHEMA import FROM lego_importer;
-REVOKE CREATE ON SCHEMA catalog FROM lego_importer;
-REVOKE CREATE ON SCHEMA definition FROM lego_importer;
+REVOKE CREATE ON SCHEMA app FROM brktrkr_import;
+REVOKE CREATE ON SCHEMA reference FROM brktrkr_import;
+REVOKE CREATE ON SCHEMA import FROM brktrkr_import;
+REVOKE CREATE ON SCHEMA catalog FROM brktrkr_import;
+REVOKE CREATE ON SCHEMA definition FROM brktrkr_import;
 
 
 /* ==========================================================================
@@ -596,51 +588,51 @@ FROM PUBLIC;
 
 GRANT EXECUTE
 ON FUNCTION import.phase4b_initialize(uuid,boolean)
-TO lego_importer;
+TO brktrkr_import;
 
 GRANT EXECUTE
 ON FUNCTION import.phase4b_run_checkpoint(uuid,text,text,integer)
-TO lego_importer;
+TO brktrkr_import;
 
 GRANT EXECUTE
 ON FUNCTION import.phase4b_progress(uuid)
-TO lego_importer;
+TO brktrkr_import;
 
 
 -- BRICKTRACKR_PHASE6_GRANTS_V1
-ALTER TABLE catalog.external_item_relationships OWNER TO lego_owner;
+ALTER TABLE catalog.external_item_relationships OWNER TO brktrkr_owner;
 REVOKE ALL ON TABLE catalog.external_item_relationships FROM PUBLIC;
-REVOKE ALL ON TABLE catalog.external_item_relationships FROM lego_api;
-REVOKE ALL ON TABLE catalog.external_item_relationships FROM lego_app;
-REVOKE ALL ON TABLE catalog.external_item_relationships FROM lego_importer;
+REVOKE ALL ON TABLE catalog.external_item_relationships FROM brktrkr_api;
+REVOKE ALL ON TABLE catalog.external_item_relationships FROM brktrkr_api;
+REVOKE ALL ON TABLE catalog.external_item_relationships FROM brktrkr_import;
 
-ALTER FUNCTION import.phase6b_reconcile(uuid) OWNER TO lego_owner;
+ALTER FUNCTION import.phase6b_reconcile(uuid) OWNER TO brktrkr_owner;
 REVOKE ALL ON FUNCTION import.phase6b_reconcile(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION import.phase6b_reconcile(uuid) FROM lego_api;
-REVOKE ALL ON FUNCTION import.phase6b_reconcile(uuid) FROM lego_app;
-GRANT EXECUTE ON FUNCTION import.phase6b_reconcile(uuid) TO lego_importer;
+REVOKE ALL ON FUNCTION import.phase6b_reconcile(uuid) FROM brktrkr_api;
+REVOKE ALL ON FUNCTION import.phase6b_reconcile(uuid) FROM brktrkr_api;
+GRANT EXECUTE ON FUNCTION import.phase6b_reconcile(uuid) TO brktrkr_import;
 
-GRANT EXECUTE ON FUNCTION app.set_import_context(uuid) TO lego_owner;
+GRANT EXECUTE ON FUNCTION app.set_import_context(uuid) TO brktrkr_owner;
 
 
 /* Canonical source-run completion lifecycle. */
 REVOKE ALL
 ON FUNCTION import.complete_source_run(uuid, jsonb)
-FROM PUBLIC, lego_api, lego_app;
+FROM PUBLIC, brktrkr_api;
 
 GRANT EXECUTE
 ON FUNCTION import.complete_source_run(uuid, jsonb)
-TO lego_importer;
+TO brktrkr_import;
 
 
 /* Canonical source-run failure lifecycle. */
 REVOKE ALL
 ON FUNCTION import.fail_source_run(uuid, text)
-FROM PUBLIC, lego_api, lego_app;
+FROM PUBLIC, brktrkr_api;
 
 GRANT EXECUTE
 ON FUNCTION import.fail_source_run(uuid, text)
-TO lego_importer;
+TO brktrkr_import;
 
 
 
@@ -649,9 +641,9 @@ REVOKE ALL ON FUNCTION import.phase5b_initialize(uuid,boolean) FROM PUBLIC;
 REVOKE ALL ON FUNCTION import.phase5b_run_checkpoint(uuid,text,text,integer) FROM PUBLIC;
 REVOKE ALL ON FUNCTION import.phase5b_progress(uuid) FROM PUBLIC;
 
-GRANT EXECUTE ON FUNCTION import.phase5b_initialize(uuid,boolean) TO lego_importer;
-GRANT EXECUTE ON FUNCTION import.phase5b_run_checkpoint(uuid,text,text,integer) TO lego_importer;
-GRANT EXECUTE ON FUNCTION import.phase5b_progress(uuid) TO lego_importer;
+GRANT EXECUTE ON FUNCTION import.phase5b_initialize(uuid,boolean) TO brktrkr_import;
+GRANT EXECUTE ON FUNCTION import.phase5b_run_checkpoint(uuid,text,text,integer) TO brktrkr_import;
+GRANT EXECUTE ON FUNCTION import.phase5b_progress(uuid) TO brktrkr_import;
 -- END BRICKTRACKR REBRICKABLE PHASE 5 CANONICAL: phase5b importer grants
 
 SELECT pg_temp.bt_mark_completed('1100_security/1107_grants.sql');

@@ -71,16 +71,43 @@ def created_api_signatures():
 
 def allowlisted_signatures():
     text = LOCKDOWN.read_text()
+
+    # Current canonical form: authoritative_allowlist CTE followed by
+    # INSERT ... SELECT. Extract the reviewed routine_signature values from
+    # the CTE rather than requiring the older INSERT ... VALUES form.
+    cte = re.search(
+        r"WITH\s+authoritative_allowlist\s*\([^)]*\)\s+AS\s*\(\s*"
+        r"VALUES\s*(.*?)\)\s*INSERT\s+INTO\s+app\.runtime_api_allowlist",
+        text,
+        re.I | re.S,
+    )
+    if cte:
+        return set(
+            s.lower()
+            for s in re.findall(
+                r"\(\s*'(api\.[^']+\))'\s*,",
+                cte.group(1),
+                re.I,
+            )
+        )
+
+    # Backward-compatible support for the legacy INSERT ... VALUES form.
     insert = re.search(
-        r"INSERT\s+INTO\s+app\.runtime_api_allowlist\s*\([^;]+?\)\s*VALUES\s*(.*?);",
+        r"INSERT\s+INTO\s+app\.runtime_api_allowlist\s*\([^;]+?\)\s*"
+        r"VALUES\s*(.*?);",
         text,
         re.I | re.S,
     )
     if not insert:
         return set()
+
     return set(
         s.lower()
-        for s in re.findall(r"\(\s*'(api\.[^']+\))'\s*,", insert.group(1), re.I)
+        for s in re.findall(
+            r"\(\s*'(api\.[^']+\))'\s*,",
+            insert.group(1),
+            re.I,
+        )
     )
 
 def main():
@@ -105,7 +132,7 @@ def main():
         )
         broad = re.compile(
             r"GRANT\s+EXECUTE\s+ON\s+ALL\s+ROUTINES\s+IN\s+SCHEMA\s+api\s+"
-            r"TO\s+[^;]*(?:lego_api|lego_app)",
+            r"TO\s+[^;]*brktrkr_api",
             re.I | re.S,
         )
         if broad.search(all_sql):
@@ -128,11 +155,12 @@ def main():
 
         required = [
             r"ALTER\s+DEFAULT\s+PRIVILEGES\s+"
+            r"(?:FOR\s+ROLE\s+brktrkr_owner\s+)?"
             r"REVOKE\s+EXECUTE\s+ON\s+ROUTINES\s+FROM\s+PUBLIC",
             r"REVOKE\s+EXECUTE\s+ON\s+ALL\s+ROUTINES\s+IN\s+SCHEMA\s+api\s+"
-            r"FROM\s+PUBLIC\s*,\s*lego_api\s*,\s*lego_app",
+            r"FROM\s+PUBLIC\s*,\s*brktrkr_api",
             r"REVOKE\s+CREATE\s+ON\s+SCHEMA\s+api\s+"
-            r"FROM\s+PUBLIC\s*,\s*lego_api\s*,\s*lego_app",
+            r"FROM\s+PUBLIC\s*,\s*brktrkr_api",
         ]
         for required_pattern in required:
             if not re.search(required_pattern, lockdown, re.I | re.S):

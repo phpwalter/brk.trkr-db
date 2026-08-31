@@ -1,74 +1,154 @@
+\set ON_ERROR_STOP on
+
 /*
 ===============================================================================
  File:           5000_function/5900_tests/5979_test_system_request_context.sql
- Project:        LEGO Collection Platform
- Schema Version: 1.1.0
+ Project:        BrickTrackr
  PostgreSQL:     16+
- Purpose:        Stored-procedure contract tests for 5000_function/5700_system/5709_system_request_context.sql.
+ Purpose:        Bootstrap-safe unit regression checks for the canonical
+                 request-context functions.
  Depends On:     5000_function/5700_system/5709_system_request_context.sql
- Creates:        Test assertions only
+ Creates:        No persistent test data
 ===============================================================================
 */
 
-\set ON_ERROR_STOP on
 SELECT pg_temp.bt_preflight('5000_function/5900_tests/5979_test_system_request_context.sql', ARRAY['5000_function/5700_system/5709_system_request_context.sql']::text[]);
 
-\echo '[TEST] 5979_test_system_request_context'
+\echo '[TEST] 5979_test_system_request_context.sql'
 
-BEGIN;
-
-DO $$
+DO $test$
 DECLARE
-    v record;
-    v_oid oid;
-    v_kind "char";
+    v_req_a uuid := '00000000-0000-7000-8000-000000005979';
+    v_req_b uuid := '00000000-0000-7000-8000-000000005980';
+    v_can_system boolean;
 BEGIN
-    FOR v IN
-        SELECT *
-        FROM (VALUES
-            ('app.current_request_id()', 'f'),
-            ('app.current_trace_id()', 'f'),
-            ('app.current_actor_class()', 'f'),
-            ('app.set_authenticated_user(uuid)', 'f'),
-            ('app.set_request_context(uuid,text,text)', 'f'),
-            ('app.set_import_context(uuid)', 'f')
-        ) AS x(signature, expected_kind)
-    LOOP
-        v_oid := to_regprocedure(v.signature);
-        PERFORM app.assert_true(
-            v_oid IS NOT NULL,
-            format('Required routine %s is missing', v.signature)
+    /* Start from a deterministic anonymous context. */
+    PERFORM app.clear_request_context();
+
+    IF identity.current_user_id() IS NOT NULL
+       OR app.current_request_id() IS NOT NULL
+       OR app.current_trace_id() IS NOT NULL
+       OR app.current_actor_class() IS NOT NULL THEN
+        RAISE EXCEPTION 'clear_request_context() did not establish an empty context'
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    /* Clear must be idempotent. */
+    PERFORM app.clear_request_context();
+    IF identity.current_user_id() IS NOT NULL
+       OR app.current_request_id() IS NOT NULL
+       OR app.current_trace_id() IS NOT NULL
+       OR app.current_actor_class() IS NOT NULL THEN
+        RAISE EXCEPTION 'clear_request_context() is not idempotent'
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    /*
+     * Bootstrap sessions vary by deployment model. Exercise the actual setter
+     * when the authenticated session has SYSTEM authority; the external
+     * adversarial runner always tests all real login-role combinations.
+     */
+    v_can_system :=
+        pg_catalog.pg_has_role(SESSION_USER, 'brktrkr_migrator', 'MEMBER')
+        OR pg_catalog.pg_has_role(SESSION_USER, 'brktrkr_owner', 'MEMBER');
+
+    IF v_can_system THEN
+        PERFORM app.set_request_context(
+            NULL,
+            v_req_a,
+            'bootstrap-system-a',
+            'SYSTEM'
         );
 
-        SELECT p.prokind
-          INTO v_kind
-          FROM pg_proc p
-         WHERE p.oid = v_oid;
+        IF identity.current_user_id() IS NOT NULL
+           OR app.current_request_id() <> v_req_a
+           OR app.current_trace_id() <> 'bootstrap-system-a'
+           OR app.current_actor_class() <> 'SYSTEM' THEN
+            RAISE EXCEPTION 'SYSTEM request context was not established correctly'
+                USING ERRCODE = 'P0001';
+        END IF;
 
-        PERFORM app.assert_true(
-            v_kind = v.expected_kind::"char",
-            format(
-                'Routine %s has prokind=%s; expected=%s',
-                v.signature, v_kind, v.expected_kind
-            )
-        );
-    END LOOP;
+        /*
+         * PL/pgSQL exception blocks are subtransactions. A failed inner block
+         * must restore the request context that existed at its entry.
+         */
+        BEGIN
+            PERFORM app.set_request_context(
+                NULL,
+                v_req_b,
+                'bootstrap-system-b',
+                'SYSTEM'
+            );
+
+            IF app.current_request_id() <> v_req_b THEN
+                RAISE EXCEPTION 'Nested request context was not established'
+                    USING ERRCODE = 'P0001';
+            END IF;
+
+            RAISE EXCEPTION 'intentional subtransaction rollback'
+                USING ERRCODE = 'P5799';
+
+        EXCEPTION
+            WHEN SQLSTATE 'P5799' THEN
+                NULL;
+        END;
+
+        IF app.current_request_id() <> v_req_a
+           OR app.current_trace_id() <> 'bootstrap-system-a'
+           OR app.current_actor_class() <> 'SYSTEM' THEN
+            RAISE EXCEPTION
+                'Subtransaction rollback did not restore the prior request context'
+                USING ERRCODE = 'P0001';
+        END IF;
+
+        /* Invalid input must fail without replacing the valid outer context. */
+        BEGIN
+            PERFORM app.set_request_context(
+                NULL,
+                v_req_b,
+                '   ',
+                'SYSTEM'
+            );
+            RAISE EXCEPTION 'Whitespace-only trace_id was accepted'
+                USING ERRCODE = 'P0001';
+        EXCEPTION
+            WHEN SQLSTATE '22023' THEN
+                NULL;
+        END;
+
+        IF app.current_request_id() <> v_req_a
+           OR app.current_trace_id() <> 'bootstrap-system-a' THEN
+            RAISE EXCEPTION
+                'Rejected setter call altered the prior request context'
+                USING ERRCODE = 'P0001';
+        END IF;
+
+        PERFORM app.clear_request_context();
+    ELSE
+        RAISE NOTICE
+            '5979: bootstrap session % lacks SYSTEM authority; setter role-matrix tests are delegated to tools/test_transaction_context.ps1',
+            SESSION_USER;
+    END IF;
+
+    IF identity.current_user_id() IS NOT NULL
+       OR app.current_request_id() IS NOT NULL
+       OR app.current_trace_id() IS NOT NULL
+       OR app.current_actor_class() IS NOT NULL THEN
+        RAISE EXCEPTION '5979 left transaction context behind'
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    BEGIN
+        PERFORM identity.require_current_user_id();
+        RAISE EXCEPTION 'require_current_user_id() accepted absent user context'
+            USING ERRCODE = 'P0001';
+    EXCEPTION
+        WHEN SQLSTATE '22004' THEN
+            NULL;
+    END;
 END;
-$$;
+$test$;
 
-
-/* Request context must round-trip inside the current transaction. */
-DO $$
-DECLARE
-    v_request uuid := gen_random_uuid();
-BEGIN
-    PERFORM app.set_request_context(v_request, 'sp-test-trace', 'ADMIN');
-    PERFORM app.assert_true(app.current_request_id() = v_request, 'request_id did not round-trip');
-    PERFORM app.assert_true(app.current_trace_id() = 'sp-test-trace', 'trace_id did not round-trip');
-    PERFORM app.assert_true(app.current_actor_class() = 'ADMIN', 'actor_class did not round-trip');
-END;
-$$;
-
-ROLLBACK;
+\echo '[PASS] 5979_test_system_request_context.sql'
 
 SELECT pg_temp.bt_mark_completed('5000_function/5900_tests/5979_test_system_request_context.sql');

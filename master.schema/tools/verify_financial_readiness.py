@@ -47,7 +47,7 @@ def main():
         require(funcs, needle, "finance functions", errors)
 
     # Runtime roles must remain excluded from the finance schema/table surface.
-    require(grants, "finance,\n    operations,\n    reporting\nFROM lego_app;", "runtime grants", errors)
+    require(grants, "finance,\n    operations,\n    reporting\nFROM brktrkr_api;", "runtime grants", errors)
 
     # The installed-catalog validator must cover the important mechanical rules.
     for needle in [

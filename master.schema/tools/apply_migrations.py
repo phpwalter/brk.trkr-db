@@ -32,7 +32,7 @@ def run_psql(psql: str, database: str, sql: str, *, capture: bool = True) -> sub
     )
 
 def query_rows(psql: str, database: str, sql: str) -> list[list[str]]:
-    owner_sql = "SET ROLE lego_owner;\n" + sql + "\nRESET ROLE;"
+    owner_sql = "SET ROLE brktrkr_owner;\n" + sql + "\nRESET ROLE;"
     proc = run_psql(psql, database, owner_sql, capture=True)
     if proc.returncode:
         sys.stderr.write(proc.stderr)
@@ -60,7 +60,7 @@ def wrapper_sql(entry: dict) -> str:
     lines = [
         r"\set ON_ERROR_STOP on",
         rf"SELECT pg_advisory_lock({LOCK_SQL});",
-        "SET ROLE lego_owner;",
+        "SET ROLE brktrkr_owner;",
         f"""DO $$
 BEGIN
     IF EXISTS (

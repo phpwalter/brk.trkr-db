@@ -37,31 +37,31 @@ ALTER TABLE audit.changes
 
 
 -- FORCE RLS intentionally remains enabled.  The trusted SECURITY DEFINER audit
--- capture path runs as lego_owner, so grant that owner role only the minimum
+-- capture path runs as brktrkr_owner, so grant that owner role only the minimum
 -- row-policy access required to append audit history and return inserted IDs.
 -- Runtime/admin roles receive no audit policies.
 CREATE POLICY audit_events_owner_insert
 ON audit.events
 FOR INSERT
-TO lego_owner
+TO brktrkr_owner
 WITH CHECK (true);
 
 CREATE POLICY audit_events_owner_select
 ON audit.events
 FOR SELECT
-TO lego_owner
+TO brktrkr_owner
 USING (true);
 
 CREATE POLICY audit_changes_owner_insert
 ON audit.changes
 FOR INSERT
-TO lego_owner
+TO brktrkr_owner
 WITH CHECK (true);
 
 CREATE POLICY audit_changes_owner_select
 ON audit.changes
 FOR SELECT
-TO lego_owner
+TO brktrkr_owner
 USING (true);
 
 SELECT app.assert_true(
@@ -95,7 +95,7 @@ BEGIN
                 FROM pg_policies
                 WHERE schemaname = 'audit'
                   AND policyname = v_policy
-                  AND roles = ARRAY['lego_owner']::name[]
+                  AND roles = ARRAY['brktrkr_owner']::name[]
             ),
             format('Required owner-only audit RLS policy %I is missing or broadened', v_policy)
         );
@@ -108,11 +108,11 @@ BEGIN
             WHERE schemaname = 'audit'
               AND (
                     'public'::name = ANY (roles)
-                 OR 'lego_api'::name = ANY (roles)
-                 OR 'lego_app'::name = ANY (roles)
-                 OR 'lego_admin'::name = ANY (roles)
-                 OR 'lego_importer'::name = ANY (roles)
-                 OR 'lego_reporting'::name = ANY (roles)
+                 OR 'brktrkr_api'::name = ANY (roles)
+                 OR 'brktrkr_api'::name = ANY (roles)
+                 OR 'brktrkr_admin'::name = ANY (roles)
+                 OR 'brktrkr_import'::name = ANY (roles)
+                 OR 'brktrkr_reporting'::name = ANY (roles)
               )
         ),
         'Audit RLS policies must not grant PUBLIC or operational roles access'

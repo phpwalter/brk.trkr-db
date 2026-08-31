@@ -8,11 +8,11 @@
                  ownership so operational roles cannot become schema owners.
  Depends On:     1100_security/1100_roles.sql
                  1100_security/1110_api_surface_lockdown.sql
- Creates:        Ownership assignment to lego_owner
-                 lego_deployer -> lego_owner membership
- Key Rules:      lego_owner is NOLOGIN and owns application objects.
-                 lego_deployer is NOLOGIN and is the only BrickTrackr group
-                 role allowed to assume lego_owner.
+ Creates:        Ownership assignment to brktrkr_owner
+                 brktrkr_migrator -> brktrkr_owner membership
+ Key Rules:      brktrkr_owner is NOLOGIN and owns application objects.
+                 brktrkr_migrator is NOLOGIN and is the only BrickTrackr group
+                 role allowed to assume brktrkr_owner.
                  Runtime/admin/import/reporting roles never own application
                  objects and never inherit deployment/ownership authority.
 ===============================================================================
@@ -23,19 +23,19 @@ SELECT pg_temp.bt_preflight('1100_security/1111_role_ownership_separation.sql', 
 \echo '[SECURITY] Separating ownership and deployment authority...'
 
 /* Known operational roles must not inherit deployment or ownership authority. */
-REVOKE lego_owner
-FROM lego_api, lego_app, lego_admin, lego_importer, lego_reporting;
+REVOKE brktrkr_owner
+FROM brktrkr_api, brktrkr_admin, brktrkr_import, brktrkr_reporting;
 
-REVOKE lego_deployer
-FROM lego_api, lego_app, lego_admin, lego_importer, lego_reporting;
+REVOKE brktrkr_migrator
+FROM brktrkr_api, brktrkr_admin, brktrkr_import, brktrkr_reporting;
 
 /* Deployment may assume ownership; no other BrickTrackr group role may do so. */
-GRANT lego_owner TO lego_deployer;
+GRANT brktrkr_owner TO brktrkr_migrator;
 
-COMMENT ON ROLE lego_owner IS
+COMMENT ON ROLE brktrkr_owner IS
     'NOLOGIN owner of BrickTrackr schemas/objects. Never used by application or human sessions directly.';
-COMMENT ON ROLE lego_deployer IS
-    'NOLOGIN deployment group. Approved deployment login(s) may be granted this role and may SET ROLE lego_owner for migrations.';
+COMMENT ON ROLE brktrkr_migrator IS
+    'NOLOGIN deployment group. Approved deployment login(s) may be granted this role and may SET ROLE brktrkr_owner for migrations.';
 
 /*
  * ALTER ... OWNER requires membership in the target role.  Bootstrap already
@@ -48,13 +48,13 @@ CREATE TEMP TABLE bt_owner_membership_state (
 ) ON COMMIT PRESERVE ROWS;
 
 INSERT INTO pg_temp.bt_owner_membership_state(added_temporarily)
-SELECT current_user <> 'lego_owner'
-   AND NOT pg_has_role(current_user, 'lego_owner', 'MEMBER');
+SELECT current_user <> 'brktrkr_owner'
+   AND NOT pg_has_role(current_user, 'brktrkr_owner', 'MEMBER');
 
 DO $$
 BEGIN
     IF (SELECT added_temporarily FROM pg_temp.bt_owner_membership_state) THEN
-        EXECUTE format('GRANT lego_owner TO %I', current_user);
+        EXECUTE format('GRANT brktrkr_owner TO %I', current_user);
     END IF;
 END;
 $$;
@@ -85,7 +85,7 @@ BEGIN
             WHEN 'f' THEN 'ALTER FOREIGN TABLE'
         END;
         EXECUTE format(
-            '%s %I.%I OWNER TO lego_owner',
+            '%s %I.%I OWNER TO brktrkr_owner',
             v_command, v.nspname, v.relname
         );
     END LOOP;
@@ -117,7 +117,7 @@ BEGIN
         ORDER BY n.nspname, c.relname
     LOOP
         EXECUTE format(
-            'ALTER SEQUENCE %I.%I OWNER TO lego_owner',
+            'ALTER SEQUENCE %I.%I OWNER TO brktrkr_owner',
             v.nspname, v.relname
         );
     END LOOP;
@@ -141,7 +141,7 @@ BEGIN
         ORDER BY p.oid
     LOOP
         EXECUTE format(
-            'ALTER ROUTINE %s OWNER TO lego_owner',
+            'ALTER ROUTINE %s OWNER TO brktrkr_owner',
             v.oid::regprocedure
         );
     END LOOP;
@@ -172,12 +172,12 @@ BEGIN
     LOOP
         IF v.typtype = 'd' THEN
             EXECUTE format(
-                'ALTER DOMAIN %I.%I OWNER TO lego_owner',
+                'ALTER DOMAIN %I.%I OWNER TO brktrkr_owner',
                 v.nspname, v.typname
             );
         ELSE
             EXECUTE format(
-                'ALTER TYPE %I.%I OWNER TO lego_owner',
+                'ALTER TYPE %I.%I OWNER TO brktrkr_owner',
                 v.nspname, v.typname
             );
         END IF;
@@ -196,9 +196,9 @@ BEGIN
         'finance','operations','reporting'
     ]
     LOOP
-        EXECUTE format('ALTER SCHEMA %I OWNER TO lego_owner', v_schema);
+        EXECUTE format('ALTER SCHEMA %I OWNER TO brktrkr_owner', v_schema);
         EXECUTE format(
-            'REVOKE CREATE ON SCHEMA %I FROM PUBLIC, lego_api, lego_app, lego_admin, lego_importer, lego_reporting',
+            'REVOKE CREATE ON SCHEMA %I FROM PUBLIC, brktrkr_api, brktrkr_admin, brktrkr_import, brktrkr_reporting',
             v_schema
         );
     END LOOP;
@@ -206,25 +206,25 @@ END;
 $$;
 
 /*
- * Objects created while SET ROLE lego_owner must start private.  Grants to
+ * Objects created while SET ROLE brktrkr_owner must start private.  Grants to
  * runtime/admin/import/reporting roles are always deliberate migration changes.
  */
-ALTER DEFAULT PRIVILEGES FOR ROLE lego_owner
-    REVOKE ALL ON TABLES FROM PUBLIC, lego_api, lego_app, lego_admin, lego_importer, lego_reporting;
-ALTER DEFAULT PRIVILEGES FOR ROLE lego_owner
-    REVOKE ALL ON SEQUENCES FROM PUBLIC, lego_api, lego_app, lego_admin, lego_importer, lego_reporting;
-ALTER DEFAULT PRIVILEGES FOR ROLE lego_owner
-    REVOKE EXECUTE ON ROUTINES FROM PUBLIC, lego_api, lego_app, lego_admin, lego_importer, lego_reporting;
-ALTER DEFAULT PRIVILEGES FOR ROLE lego_owner
-    REVOKE USAGE ON TYPES FROM PUBLIC, lego_api, lego_app, lego_admin, lego_importer, lego_reporting;
-ALTER DEFAULT PRIVILEGES FOR ROLE lego_owner
-    REVOKE ALL ON SCHEMAS FROM PUBLIC, lego_api, lego_app, lego_admin, lego_importer, lego_reporting;
+ALTER DEFAULT PRIVILEGES FOR ROLE brktrkr_owner
+    REVOKE ALL ON TABLES FROM PUBLIC, brktrkr_api, brktrkr_admin, brktrkr_import, brktrkr_reporting;
+ALTER DEFAULT PRIVILEGES FOR ROLE brktrkr_owner
+    REVOKE ALL ON SEQUENCES FROM PUBLIC, brktrkr_api, brktrkr_admin, brktrkr_import, brktrkr_reporting;
+ALTER DEFAULT PRIVILEGES FOR ROLE brktrkr_owner
+    REVOKE EXECUTE ON ROUTINES FROM PUBLIC, brktrkr_api, brktrkr_admin, brktrkr_import, brktrkr_reporting;
+ALTER DEFAULT PRIVILEGES FOR ROLE brktrkr_owner
+    REVOKE USAGE ON TYPES FROM PUBLIC, brktrkr_api, brktrkr_admin, brktrkr_import, brktrkr_reporting;
+ALTER DEFAULT PRIVILEGES FOR ROLE brktrkr_owner
+    REVOKE ALL ON SCHEMAS FROM PUBLIC, brktrkr_api, brktrkr_admin, brktrkr_import, brktrkr_reporting;
 
 /* Remove only the bootstrap membership we added ourselves. */
 DO $$
 BEGIN
     IF (SELECT added_temporarily FROM pg_temp.bt_owner_membership_state) THEN
-        EXECUTE format('REVOKE lego_owner FROM %I', current_user);
+        EXECUTE format('REVOKE brktrkr_owner FROM %I', current_user);
     END IF;
 END;
 $$;

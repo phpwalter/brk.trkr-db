@@ -24,13 +24,12 @@ BEGIN
     FOR v IN
         SELECT *
         FROM (VALUES
-            ('lego_api',       false, true),
-            ('lego_app',       false, true),
-            ('lego_reporting', false, true),
-            ('lego_admin',     true,  true),
-            ('lego_importer',  true,  true),
-            ('lego_owner',     false, false),
-            ('lego_deployer',  false, false)
+            ('brktrkr_api',       false, true),
+            ('brktrkr_import',    false, true),
+            ('brktrkr_admin',     false, true),
+            ('brktrkr_reporting', false, true),
+            ('brktrkr_owner',     false, false),
+            ('brktrkr_migrator',  false, false)
         ) AS x(role_name, bypass_rls, inherit_ok)
     LOOP
         PERFORM app.assert_true(
@@ -54,8 +53,8 @@ $$;
 
 /* Only the deployment group may assume the object-owner role. */
 SELECT app.assert_true(
-    pg_has_role('lego_deployer', 'lego_owner', 'MEMBER'),
-    'lego_deployer must be a member of lego_owner'
+    pg_has_role('brktrkr_migrator', 'brktrkr_owner', 'MEMBER'),
+    'brktrkr_migrator must be a member of brktrkr_owner'
 );
 
 DO $$
@@ -63,16 +62,16 @@ DECLARE
     v_role text;
 BEGIN
     FOREACH v_role IN ARRAY ARRAY[
-        'lego_api','lego_app','lego_admin','lego_importer','lego_reporting'
+        'brktrkr_api','brktrkr_import','brktrkr_admin','brktrkr_reporting'
     ]
     LOOP
         PERFORM app.assert_true(
-            NOT pg_has_role(v_role, 'lego_owner', 'MEMBER'),
-            format('%s must not inherit/assume lego_owner', v_role)
+            NOT pg_has_role(v_role, 'brktrkr_owner', 'MEMBER'),
+            format('%s must not inherit/assume brktrkr_owner', v_role)
         );
         PERFORM app.assert_true(
-            NOT pg_has_role(v_role, 'lego_deployer', 'MEMBER'),
-            format('%s must not inherit/assume lego_deployer', v_role)
+            NOT pg_has_role(v_role, 'brktrkr_migrator', 'MEMBER'),
+            format('%s must not inherit/assume brktrkr_migrator', v_role)
         );
     END LOOP;
 END;
@@ -89,12 +88,12 @@ SELECT app.assert_true(
             'wanted','moc','import','audit','api','admin','marketplace',
             'finance','operations','reporting'
         )
-          AND r.rolname <> 'lego_owner'
+          AND r.rolname <> 'brktrkr_owner'
     ),
-    'An application schema is not owned by lego_owner'
+    'An application schema is not owned by brktrkr_owner'
 );
 
-/* Persistent relations and sequences are owned only by lego_owner. */
+/* Persistent relations and sequences are owned only by brktrkr_owner. */
 SELECT app.assert_true(
     NOT EXISTS (
         SELECT 1
@@ -107,9 +106,9 @@ SELECT app.assert_true(
             'finance','operations','reporting'
         )
           AND c.relkind IN ('r','p','v','m','S','f')
-          AND r.rolname <> 'lego_owner'
+          AND r.rolname <> 'brktrkr_owner'
     ),
-    'An application relation/sequence is not owned by lego_owner'
+    'An application relation/sequence is not owned by brktrkr_owner'
 );
 
 /* All application routines, including SECURITY DEFINER code, share one owner. */
@@ -124,9 +123,9 @@ SELECT app.assert_true(
             'wanted','moc','import','audit','api','admin','marketplace',
             'finance','operations','reporting'
         )
-          AND r.rolname <> 'lego_owner'
+          AND r.rolname <> 'brktrkr_owner'
     ),
-    'An application routine is not owned by lego_owner'
+    'An application routine is not owned by brktrkr_owner'
 );
 
 /* Standalone domains/enums/ranges/composite types are owner-controlled too. */
@@ -146,9 +145,9 @@ SELECT app.assert_true(
               t.typtype IN ('d','e','r','m')
               OR (t.typtype = 'c' AND c.relkind = 'c')
           )
-          AND r.rolname <> 'lego_owner'
+          AND r.rolname <> 'brktrkr_owner'
     ),
-    'An application standalone type/domain is not owned by lego_owner'
+    'An application standalone type/domain is not owned by brktrkr_owner'
 );
 
 /* No operational group may CREATE objects in application schemas. */
@@ -158,7 +157,7 @@ DECLARE
     v_schema record;
 BEGIN
     FOREACH v_role IN ARRAY ARRAY[
-        'lego_api','lego_app','lego_admin','lego_importer','lego_reporting'
+        'brktrkr_api','brktrkr_import','brktrkr_admin','brktrkr_reporting'
     ]
     LOOP
         FOR v_schema IN
@@ -179,21 +178,21 @@ BEGIN
 END;
 $$;
 
-/* lego_owner-created routines/types may never fall back to PUBLIC defaults. */
+/* brktrkr_owner-created routines/types may never fall back to PUBLIC defaults. */
 SELECT app.assert_true(
     NOT EXISTS (
         SELECT 1
         FROM pg_default_acl d
         JOIN pg_roles owner_role ON owner_role.oid = d.defaclrole
         CROSS JOIN LATERAL aclexplode(d.defaclacl) a
-        WHERE owner_role.rolname = 'lego_owner'
+        WHERE owner_role.rolname = 'brktrkr_owner'
           AND a.grantee = 0
           AND (
               (d.defaclobjtype = 'f' AND a.privilege_type = 'EXECUTE')
               OR (d.defaclobjtype = 'T' AND a.privilege_type = 'USAGE')
           )
     ),
-    'lego_owner default privileges expose routines/types to PUBLIC'
+    'brktrkr_owner default privileges expose routines/types to PUBLIC'
 );
 
 /* Runtime/admin/import/reporting must not receive automatic owner defaults.
@@ -205,12 +204,12 @@ SELECT app.assert_true(
         JOIN pg_roles owner_role ON owner_role.oid = d.defaclrole
         CROSS JOIN LATERAL aclexplode(d.defaclacl) a
         JOIN pg_roles grantee_role ON grantee_role.oid = a.grantee
-        WHERE owner_role.rolname = 'lego_owner'
+        WHERE owner_role.rolname = 'brktrkr_owner'
           AND grantee_role.rolname IN (
-              'lego_api','lego_app','lego_admin','lego_importer','lego_reporting'
+              'brktrkr_api','brktrkr_import','brktrkr_admin','brktrkr_reporting'
           )
     ),
-    'lego_owner default privileges automatically grant an operational role'
+    'brktrkr_owner default privileges automatically grant an operational role'
 );
 
 
@@ -218,7 +217,7 @@ SELECT app.assert_true(
 SELECT app.assert_true(
     (
         SELECT p.prosecdef
-           AND owner_role.rolname = 'lego_owner'
+           AND owner_role.rolname = 'brktrkr_owner'
         FROM pg_proc p
         JOIN pg_namespace n ON n.oid = p.pronamespace
         JOIN pg_roles owner_role ON owner_role.oid = p.proowner
@@ -226,7 +225,7 @@ SELECT app.assert_true(
           AND p.proname = 'capture_row_change'
           AND pg_get_function_identity_arguments(p.oid) = ''
     ),
-    'audit.capture_row_change() must be SECURITY DEFINER owned by lego_owner'
+    'audit.capture_row_change() must be SECURITY DEFINER owned by brktrkr_owner'
 );
 
 SELECT app.assert_true(
@@ -252,7 +251,7 @@ SELECT app.assert_true(
               'audit_changes_owner_insert',
               'audit_changes_owner_select'
           )
-          AND roles = ARRAY['lego_owner']::name[]
+          AND roles = ARRAY['brktrkr_owner']::name[]
     ) = 4,
     'Owner-only audit RLS policies are missing or broadened'
 );
@@ -264,11 +263,11 @@ SELECT app.assert_true(
         WHERE schemaname = 'audit'
           AND (
                 'public'::name = ANY (roles)
-             OR 'lego_api'::name = ANY (roles)
-             OR 'lego_app'::name = ANY (roles)
-             OR 'lego_admin'::name = ANY (roles)
-             OR 'lego_importer'::name = ANY (roles)
-             OR 'lego_reporting'::name = ANY (roles)
+             OR 'brktrkr_api'::name = ANY (roles)
+             OR 'brktrkr_admin'::name = ANY (roles)
+             OR 'brktrkr_import'::name = ANY (roles)
+             OR 'brktrkr_reporting'::name = ANY (roles)
+             OR 'brktrkr_migrator'::name = ANY (roles)
           )
     ),
     'Operational/PUBLIC roles must not receive audit-table RLS policies'

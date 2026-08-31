@@ -16,39 +16,39 @@ def main() -> int:
     validator = VALIDATOR.read_text(encoding="utf-8")
     migrator = MIGRATOR.read_text(encoding="utf-8")
 
-    for role in ("lego_owner", "lego_deployer"):
+    for role in ("brktrkr_owner", "brktrkr_migrator"):
         if f"CREATE ROLE {role}" not in roles:
             errors.append(f"{role}: missing role creation")
         if "NOLOGIN" not in roles:
             errors.append("role definitions must remain NOLOGIN")
 
     required_owner_fragments = [
-        "GRANT lego_owner TO lego_deployer",
-        "ALTER SCHEMA %I OWNER TO lego_owner",
-        "ALTER ROUTINE %s OWNER TO lego_owner",
-        "ALTER DEFAULT PRIVILEGES FOR ROLE lego_owner",
-        "REVOKE lego_owner",
-        "REVOKE lego_deployer",
+        "GRANT brktrkr_owner TO brktrkr_migrator",
+        "ALTER SCHEMA %I OWNER TO brktrkr_owner",
+        "ALTER ROUTINE %s OWNER TO brktrkr_owner",
+        "ALTER DEFAULT PRIVILEGES FOR ROLE brktrkr_owner",
+        "REVOKE brktrkr_owner",
+        "REVOKE brktrkr_migrator",
     ]
     for fragment in required_owner_fragments:
         if fragment not in ownership:
             errors.append(f"ownership contract missing: {fragment}")
 
-    if "SET ROLE lego_owner" not in migrator:
-        errors.append("migration runner does not SET ROLE lego_owner")
+    if "SET ROLE brktrkr_owner" not in migrator:
+        errors.append("migration runner does not SET ROLE brktrkr_owner")
 
     for needle in (
-        "pg_has_role('lego_deployer', 'lego_owner', 'MEMBER')",
-        "An application schema is not owned by lego_owner",
-        "An application relation/sequence is not owned by lego_owner",
-        "An application routine is not owned by lego_owner",
+        "pg_has_role('brktrkr_migrator', 'brktrkr_owner', 'MEMBER')",
+        "An application schema is not owned by brktrkr_owner",
+        "An application relation/sequence is not owned by brktrkr_owner",
+        "An application routine is not owned by brktrkr_owner",
     ):
         if needle not in validator:
             errors.append(f"role-separation validator missing assertion: {needle}")
 
     # Operational group roles must never be made members of owner/deployer in source.
     forbidden = re.compile(
-        r"GRANT\s+(?:lego_owner|lego_deployer)\s+TO\s+"
+        r"GRANT\s+(?:brktrkr_owner|brktrkr_migrator)\s+TO\s+"
         r"(?:lego_api|lego_app|lego_admin|lego_importer|lego_reporting)\b",
         re.I
     )

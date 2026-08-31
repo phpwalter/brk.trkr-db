@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "files": [
     {
       "ordinal": 1,
@@ -896,22 +896,13 @@
     },
     {
       "ordinal": 104,
-      "file": "5000_function/5700_system/5709_system_request_context.sql",
-      "depends_on": [
-        "app schema",
-        "identity.current_user_id()",
-        "audit.events"
-      ]
-    },
-    {
-      "ordinal": 105,
       "file": "5000_function/5100_admin/5120_admin_definition_graph.sql",
       "depends_on": [
         "definition.manifest_subassemblies"
       ]
     },
     {
-      "ordinal": 106,
+      "ordinal": 105,
       "file": "5000_function/5200_api/5210_api_operational.sql",
       "depends_on": [
         "catalog.item_search",
@@ -929,7 +920,7 @@
       ]
     },
     {
-      "ordinal": 107,
+      "ordinal": 106,
       "file": "5000_function/5100_admin/5130_admin_finance.sql",
       "depends_on": [
         "finance.accounts",
@@ -940,7 +931,7 @@
       ]
     },
     {
-      "ordinal": 108,
+      "ordinal": 107,
       "file": "5000_function/5000_importer/5010_importer_rebrickable_reference_reconcile.sql",
       "depends_on": [
         "5000_function/5000_importer/5000_importer_common.sql",
@@ -954,7 +945,7 @@
       ]
     },
     {
-      "ordinal": 109,
+      "ordinal": 108,
       "file": "5000_function/5000_importer/5011_importer_rebrickable_catalog_reconcile.sql",
       "depends_on": [
         "5000_function/5000_importer/5000_importer_common.sql",
@@ -976,14 +967,47 @@
       ]
     },
     {
-      "ordinal": 110,
+      "ordinal": 109,
       "file": "5000_function/5000_importer/5012_importer_fail_source_run.sql",
       "depends_on": [
         "5000_function/5000_importer/5000_importer_common.sql"
       ]
     },
     {
+      "ordinal": 110,
+      "file": "1000_reporting/1000_reporting_views.sql",
+      "depends_on": [
+        "catalog.items",
+        "collection.entries",
+        "collection.instances",
+        "wanted.wishlist_entries",
+        "moc.mocs",
+        "moc.revisions",
+        "import.jobs",
+        "marketplace.listings",
+        "marketplace.orders",
+        "finance.transactions",
+        "operations.notifications"
+      ]
+    },
+    {
       "ordinal": 111,
+      "file": "1100_security/1100_roles.sql",
+      "depends_on": [
+        "PostgreSQL role-creation privileges"
+      ]
+    },
+    {
+      "ordinal": 112,
+      "file": "5000_function/5700_system/5709_system_request_context.sql",
+      "depends_on": [
+        "0000_bootstrap/0001_schemas.sql",
+        "0100_identity/0100_users.sql",
+        "1100_security/1100_roles.sql"
+      ]
+    },
+    {
+      "ordinal": 113,
       "file": "5000_function/5100_admin/5100_admin_common.sql",
       "depends_on": [
         "5000_function/5700_system/5707_system_audit.sql",
@@ -992,7 +1016,7 @@
       ]
     },
     {
-      "ordinal": 112,
+      "ordinal": 114,
       "file": "5000_function/5100_admin/5110_admin_catalog_lifecycle.sql",
       "depends_on": [
         "5000_function/5100_admin/5100_admin_common.sql",
@@ -1000,7 +1024,7 @@
       ]
     },
     {
-      "ordinal": 113,
+      "ordinal": 115,
       "file": "1200_validation/1210_function_validation.sql",
       "depends_on": [
         "5000_function/5700_system/5700_system_identity.sql",
@@ -1023,30 +1047,6 @@
         "5000_function/5000_importer/5012_importer_fail_source_run.sql",
         "5000_function/5100_admin/5100_admin_common.sql",
         "5000_function/5100_admin/5110_admin_catalog_lifecycle.sql"
-      ]
-    },
-    {
-      "ordinal": 114,
-      "file": "1000_reporting/1000_reporting_views.sql",
-      "depends_on": [
-        "catalog.items",
-        "collection.entries",
-        "collection.instances",
-        "wanted.wishlist_entries",
-        "moc.mocs",
-        "moc.revisions",
-        "import.jobs",
-        "marketplace.listings",
-        "marketplace.orders",
-        "finance.transactions",
-        "operations.notifications"
-      ]
-    },
-    {
-      "ordinal": 115,
-      "file": "1100_security/1100_roles.sql",
-      "depends_on": [
-        "PostgreSQL role-creation privileges"
       ]
     },
     {
@@ -1232,22 +1232,43 @@
     },
     {
       "ordinal": 131,
-      "file": "1100_security/1112_admin_execute_only.sql",
+      "file": "5000_function/5100_admin/5140_users.sql",
       "depends_on": [
         "5000_function/5100_admin/5100_admin_common.sql",
-        "5000_function/5100_admin/5110_admin_catalog_lifecycle.sql",
-        "1100_security/1111_role_ownership_separation.sql"
+        "0100_identity/0100_users.sql",
+        "1100_security/1100_roles.sql"
       ]
     },
     {
       "ordinal": 132,
+      "file": "5000_function/5100_admin/5150_audit.sql",
+      "depends_on": [
+        "5000_function/5100_admin/5140_users.sql",
+        "0900_audit/0900_audit_events.sql",
+        "0900_audit/0901_audit_changes.sql",
+        "1100_security/1100_roles.sql"
+      ]
+    },
+    {
+      "ordinal": 133,
+      "file": "1100_security/1112_admin_execute_only.sql",
+      "depends_on": [
+        "5000_function/5100_admin/5100_admin_common.sql",
+        "5000_function/5100_admin/5110_admin_catalog_lifecycle.sql",
+        "5000_function/5100_admin/5140_users.sql",
+        "5000_function/5100_admin/5150_audit.sql",
+        "1100_security/1111_role_ownership_separation.sql"
+      ]
+    },
+    {
+      "ordinal": 134,
       "file": "1200_validation/1211_security_validation.sql",
       "depends_on": [
         "Complete 1100_security domain"
       ]
     },
     {
-      "ordinal": 133,
+      "ordinal": 135,
       "file": "1200_validation/1212_integrity_validation.sql",
       "depends_on": [
         "5000_function/5700_system/5708_system_integrity_hardening.sql",
@@ -1255,7 +1276,7 @@
       ]
     },
     {
-      "ordinal": 134,
+      "ordinal": 136,
       "file": "1200_validation/1214_extended_architecture_validation.sql",
       "depends_on": [
         "catalog.part_molds",
@@ -1272,7 +1293,7 @@
       ]
     },
     {
-      "ordinal": 135,
+      "ordinal": 137,
       "file": "1200_validation/1215_security_contract_validation.sql",
       "depends_on": [
         "1100_security/1107_grants.sql",
@@ -1300,7 +1321,7 @@
       ]
     },
     {
-      "ordinal": 136,
+      "ordinal": 138,
       "file": "1200_validation/1216_adversarial_authorization_validation.sql",
       "depends_on": [
         "1200_validation/1215_security_contract_validation.sql",
@@ -1311,19 +1332,14 @@
       ]
     },
     {
-      "ordinal": 137,
+      "ordinal": 139,
       "file": "1200_validation/1217_pgbouncer_transaction_context_validation.sql",
       "depends_on": [
-        "1200_validation/1216_adversarial_authorization_validation.sql",
-        "app.set_authenticated_user(uuid)",
-        "app.set_request_context(uuid,text,text)",
-        "app.set_import_context(uuid)",
-        "identity.current_user_id()",
-        "identity.current_user_id_optional()"
+        "5000_function/5700_system/5709_system_request_context.sql"
       ]
     },
     {
-      "ordinal": 138,
+      "ordinal": 140,
       "file": "1200_validation/1218_api_surface_validation.sql",
       "depends_on": [
         "1100_security/1110_api_surface_lockdown.sql",
@@ -1331,7 +1347,7 @@
       ]
     },
     {
-      "ordinal": 139,
+      "ordinal": 141,
       "file": "1200_validation/1219_migration_framework_validation.sql",
       "depends_on": [
         "0000_bootstrap/0005_migration_framework.sql",
@@ -1339,7 +1355,7 @@
       ]
     },
     {
-      "ordinal": 140,
+      "ordinal": 142,
       "file": "1200_validation/1220_financial_readiness_validation.sql",
       "depends_on": [
         "0760_finance/0761_financial_readiness_anchors.sql",
@@ -1349,14 +1365,14 @@
       ]
     },
     {
-      "ordinal": 141,
+      "ordinal": 143,
       "file": "1200_validation/1221_operational_integrity_validation.sql",
       "depends_on": [
         "1200_validation/1220_financial_readiness_validation.sql"
       ]
     },
     {
-      "ordinal": 142,
+      "ordinal": 144,
       "file": "1200_validation/1222_role_separation_validation.sql",
       "depends_on": [
         "1100_security/1111_role_ownership_separation.sql",
@@ -1364,7 +1380,7 @@
       ]
     },
     {
-      "ordinal": 143,
+      "ordinal": 145,
       "file": "1200_validation/1223_admin_catalog_lifecycle_validation.sql",
       "depends_on": [
         "1100_security/1112_admin_execute_only.sql",
@@ -1372,14 +1388,14 @@
       ]
     },
     {
-      "ordinal": 144,
+      "ordinal": 146,
       "file": "1200_validation/1224_system_summary_validation.sql",
       "depends_on": [
         "1000_reporting/1010_reporting_system_summary.sql"
       ]
     },
     {
-      "ordinal": 145,
+      "ordinal": 147,
       "file": "1200_validation/1225_aggregate_tables_validation.sql",
       "depends_on": [
         "1000_reporting/1011_reporting_aggregate_tables.sql",
@@ -1387,7 +1403,7 @@
       ]
     },
     {
-      "ordinal": 146,
+      "ordinal": 148,
       "file": "1200_validation/1226_set_manifest_enrichment_validation.sql",
       "depends_on": [
         "0400_definitions/0410_set_manifest_components.sql",
@@ -1397,35 +1413,35 @@
       ]
     },
     {
-      "ordinal": 147,
+      "ordinal": 149,
       "file": "5000_function/5900_tests/5900_test_importer_common.sql",
       "depends_on": [
         "5000_function/5000_importer/5000_importer_common.sql"
       ]
     },
     {
-      "ordinal": 148,
+      "ordinal": 150,
       "file": "5000_function/5900_tests/5901_test_rebrickable_reference_reconcile.sql",
       "depends_on": [
         "5000_function/5000_importer/5010_importer_rebrickable_reference_reconcile.sql"
       ]
     },
     {
-      "ordinal": 149,
+      "ordinal": 151,
       "file": "5000_function/5900_tests/5902_test_rebrickable_catalog_reconcile.sql",
       "depends_on": [
         "5000_function/5000_importer/5011_importer_rebrickable_catalog_reconcile.sql"
       ]
     },
     {
-      "ordinal": 150,
+      "ordinal": 152,
       "file": "5000_function/5900_tests/5903_test_fail_source_run.sql",
       "depends_on": [
         "5000_function/5000_importer/5012_importer_fail_source_run.sql"
       ]
     },
     {
-      "ordinal": 151,
+      "ordinal": 153,
       "file": "5000_function/5900_tests/5904_test_set_manifest_enrichment.sql",
       "depends_on": [
         "5000_function/5000_importer/5030_importer_set_manifest_enrichment.sql",
@@ -1434,7 +1450,7 @@
       ]
     },
     {
-      "ordinal": 152,
+      "ordinal": 154,
       "file": "5000_function/5900_tests/5910_test_admin_common.sql",
       "depends_on": [
         "5000_function/5100_admin/5100_admin_common.sql",
@@ -1442,7 +1458,7 @@
       ]
     },
     {
-      "ordinal": 153,
+      "ordinal": 155,
       "file": "5000_function/5900_tests/5911_test_admin_catalog_lifecycle.sql",
       "depends_on": [
         "5000_function/5100_admin/5110_admin_catalog_lifecycle.sql",
@@ -1451,112 +1467,112 @@
       ]
     },
     {
-      "ordinal": 154,
+      "ordinal": 156,
       "file": "5000_function/5900_tests/5912_test_admin_definition_graph.sql",
       "depends_on": [
         "5000_function/5100_admin/5120_admin_definition_graph.sql"
       ]
     },
     {
-      "ordinal": 155,
+      "ordinal": 157,
       "file": "5000_function/5900_tests/5913_test_admin_finance.sql",
       "depends_on": [
         "5000_function/5100_admin/5130_admin_finance.sql"
       ]
     },
     {
-      "ordinal": 156,
+      "ordinal": 158,
       "file": "5000_function/5900_tests/5920_test_api_moc_access.sql",
       "depends_on": [
         "5000_function/5200_api/5200_api_moc_access.sql"
       ]
     },
     {
-      "ordinal": 157,
+      "ordinal": 159,
       "file": "5000_function/5900_tests/5921_test_api_operational.sql",
       "depends_on": [
         "5000_function/5200_api/5210_api_operational.sql"
       ]
     },
     {
-      "ordinal": 158,
+      "ordinal": 160,
       "file": "5000_function/5900_tests/5970_test_system_identity.sql",
       "depends_on": [
         "5000_function/5700_system/5700_system_identity.sql"
       ]
     },
     {
-      "ordinal": 159,
+      "ordinal": 161,
       "file": "5000_function/5900_tests/5971_test_system_hierarchy.sql",
       "depends_on": [
         "5000_function/5700_system/5701_system_hierarchy.sql"
       ]
     },
     {
-      "ordinal": 160,
+      "ordinal": 162,
       "file": "5000_function/5900_tests/5972_test_system_catalog.sql",
       "depends_on": [
         "5000_function/5700_system/5702_system_catalog.sql"
       ]
     },
     {
-      "ordinal": 161,
+      "ordinal": 163,
       "file": "5000_function/5900_tests/5973_test_system_definition.sql",
       "depends_on": [
         "5000_function/5700_system/5703_system_definition.sql"
       ]
     },
     {
-      "ordinal": 162,
+      "ordinal": 164,
       "file": "5000_function/5900_tests/5974_test_system_collection.sql",
       "depends_on": [
         "5000_function/5700_system/5704_system_collection.sql"
       ]
     },
     {
-      "ordinal": 163,
+      "ordinal": 165,
       "file": "5000_function/5900_tests/5975_test_system_wanted.sql",
       "depends_on": [
         "5000_function/5700_system/5705_system_wanted.sql"
       ]
     },
     {
-      "ordinal": 164,
+      "ordinal": 166,
       "file": "5000_function/5900_tests/5976_test_system_moc.sql",
       "depends_on": [
         "5000_function/5700_system/5706_system_moc.sql"
       ]
     },
     {
-      "ordinal": 165,
+      "ordinal": 167,
       "file": "5000_function/5900_tests/5977_test_system_audit.sql",
       "depends_on": [
         "5000_function/5700_system/5707_system_audit.sql"
       ]
     },
     {
-      "ordinal": 166,
+      "ordinal": 168,
       "file": "5000_function/5900_tests/5978_test_system_integrity.sql",
       "depends_on": [
         "5000_function/5700_system/5708_system_integrity_hardening.sql"
       ]
     },
     {
-      "ordinal": 167,
+      "ordinal": 169,
       "file": "5000_function/5900_tests/5979_test_system_request_context.sql",
       "depends_on": [
         "5000_function/5700_system/5709_system_request_context.sql"
       ]
     },
     {
-      "ordinal": 168,
+      "ordinal": 170,
       "file": "5000_function/5900_tests/5980_test_system_summary.sql",
       "depends_on": [
         "1000_reporting/1010_reporting_system_summary.sql"
       ]
     },
     {
-      "ordinal": 169,
+      "ordinal": 171,
       "file": "5000_function/5900_tests/5981_test_aggregate_tables.sql",
       "depends_on": [
         "1000_reporting/1011_reporting_aggregate_tables.sql",
@@ -1564,7 +1580,7 @@
       ]
     },
     {
-      "ordinal": 170,
+      "ordinal": 172,
       "file": "1200_validation/1213_dependency_validation.sql",
       "depends_on": [
         "1200_validation/1212_integrity_validation.sql",

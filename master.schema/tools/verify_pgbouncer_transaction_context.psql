@@ -1,0 +1,135 @@
+\set ON_ERROR_STOP on
+
+\if :{?user_id}
+\else
+    \echo '[FAIL] user_id psql variable is required'
+    \quit 2
+\endif
+
+\echo '[RUN ] PgBouncer transaction-context contract'
+
+/* Autocommit setter must not survive the statement transaction. */
+SELECT app.set_request_context(
+    :'user_id'::uuid,
+    '00000000-0000-7000-8000-00000000a001'::uuid,
+    'pgbouncer-autocommit',
+    'USER'
+);
+
+SELECT (
+    identity.current_user_id() IS NULL
+    AND app.current_request_id() IS NULL
+    AND app.current_trace_id() IS NULL
+    AND app.current_actor_class() IS NULL
+) AS bt_ok \gset
+
+\if :bt_ok
+\else
+    \echo '[FAIL] Autocommit setter leaked context into the next statement'
+    \quit 3
+\endif
+
+/* Explicit transaction: context visible inside, gone after COMMIT. */
+BEGIN;
+SELECT app.set_request_context(
+    :'user_id'::uuid,
+    '00000000-0000-7000-8000-00000000a002'::uuid,
+    'pgbouncer-commit',
+    'USER'
+);
+
+SELECT (
+    identity.current_user_id() = :'user_id'::uuid
+    AND app.current_request_id() = '00000000-0000-7000-8000-00000000a002'::uuid
+    AND app.current_trace_id() = 'pgbouncer-commit'
+    AND app.current_actor_class() = 'USER'
+) AS bt_ok \gset
+
+\if :bt_ok
+\else
+    \echo '[FAIL] Request context is not visible inside explicit transaction'
+    ROLLBACK;
+    \quit 3
+\endif
+COMMIT;
+
+SELECT (
+    identity.current_user_id() IS NULL
+    AND app.current_request_id() IS NULL
+    AND app.current_trace_id() IS NULL
+    AND app.current_actor_class() IS NULL
+) AS bt_ok \gset
+
+\if :bt_ok
+\else
+    \echo '[FAIL] Request context leaked across COMMIT'
+    \quit 3
+\endif
+
+/* ROLLBACK boundary. */
+BEGIN;
+SELECT app.set_request_context(
+    :'user_id'::uuid,
+    '00000000-0000-7000-8000-00000000a003'::uuid,
+    'pgbouncer-rollback',
+    'USER'
+);
+ROLLBACK;
+
+SELECT (
+    identity.current_user_id() IS NULL
+    AND app.current_request_id() IS NULL
+    AND app.current_trace_id() IS NULL
+    AND app.current_actor_class() IS NULL
+) AS bt_ok \gset
+
+\if :bt_ok
+\else
+    \echo '[FAIL] Request context leaked across ROLLBACK'
+    \quit 3
+\endif
+
+/* Savepoint restoration. */
+BEGIN;
+SELECT app.set_request_context(
+    :'user_id'::uuid,
+    '00000000-0000-7000-8000-00000000a004'::uuid,
+    'pgbouncer-savepoint-a',
+    'USER'
+);
+SAVEPOINT s1;
+SELECT app.set_request_context(
+    :'user_id'::uuid,
+    '00000000-0000-7000-8000-00000000a005'::uuid,
+    'pgbouncer-savepoint-b',
+    'USER'
+);
+ROLLBACK TO SAVEPOINT s1;
+
+SELECT (
+    app.current_request_id() = '00000000-0000-7000-8000-00000000a004'::uuid
+    AND app.current_trace_id() = 'pgbouncer-savepoint-a'
+) AS bt_ok \gset
+
+\if :bt_ok
+\else
+    \echo '[FAIL] ROLLBACK TO SAVEPOINT did not restore prior request context'
+    ROLLBACK;
+    \quit 3
+\endif
+COMMIT;
+
+SELECT (
+    identity.current_user_id() IS NULL
+    AND app.current_request_id() IS NULL
+    AND app.current_trace_id() IS NULL
+    AND app.current_actor_class() IS NULL
+) AS bt_ok \gset
+
+\if :bt_ok
+\else
+    \echo '[FAIL] Final PgBouncer logical connection context is not clean'
+    \quit 3
+\endif
+
+\echo '[PASS] PgBouncer transaction-context contract verified.'

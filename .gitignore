@@ -4,3 +4,9 @@
 /import/runtime/*
 /_archive/*
 /import/rebrickable-downloads/*
+/.tmp_role_model_update/
+!/.tmp_role_model_update/
+/backups/
+!/backups/
+/logs/
+!/logs/
