@@ -1,26 +1,36 @@
 \set ON_ERROR_STOP on
 
-/*
-===============================================================================
- File:           5000_function/5700_system/5709_system_request_context.sql
- Project:        BrickTrackr
- PostgreSQL:     16+
- Purpose:        Hardened canonical transaction-local request-context transport
-                 for pooled runtime connections.
- Depends On:     0000_bootstrap/0001_schemas.sql
-                 0100_identity/0100_users.sql
-                 1100_security/1100_roles.sql
- Creates:        app.set_request_context(uuid,uuid,text,text)
-                 app.clear_request_context()
-                 identity.current_user_id()
-                 identity.require_current_user_id()
-                 app.current_request_id()
-                 app.current_trace_id()
-                 app.current_actor_class()
-===============================================================================
-*/
+-- =============================================================================
+-- File: master.schema/5000_function/5700_system/5709_system_request_context.sql
+-- File Version: 1.1.0
+-- Description:
+--   Hardened canonical transaction-local request-context transport for
+--   BrickTrackr. Authentication is performed upstream by trusted application
+--   services. These GUCs carry already-established authority inside a single
+--   PostgreSQL transaction; they are not authentication primitives.
+--
+-- Security invariants:
+--   * All app.* context writes use pg_catalog.set_config(..., true).
+--   * USER context may be established only by brktrkr_api.
+--   * ADMIN context may be established only by brktrkr_admin.
+--   * IMPORTER context may be established only by brktrkr_import.
+--   * SYSTEM context may be established only by brktrkr_migrator or
+--     brktrkr_owner.
+--   * Privileged actor classes never carry an application user UUID.
+--   * SECURITY DEFINER routines use search_path = pg_catalog only.
+--   * PUBLIC receives no execution right on request-context mutators.
+--   * Context clearing is SECURITY INVOKER and transaction-local.
+--   * Request-context callers receive USAGE, not CREATE, on app/identity.
+-- =============================================================================
 
-SELECT pg_temp.bt_preflight('5000_function/5700_system/5709_system_request_context.sql', ARRAY['0000_bootstrap/0001_schemas.sql', '0100_identity/0100_users.sql', '1100_security/1100_roles.sql']::text[]);
+SELECT pg_temp.bt_preflight(
+    '5000_function/5700_system/5709_system_request_context.sql',
+    ARRAY[
+        '0000_bootstrap/0001_schemas.sql',
+        '0100_identity/0100_users.sql',
+        '1100_security/1100_roles.sql'
+    ]
+);
 
 -- =============================================================================
 -- 1. Canonical transaction-local context setter
@@ -57,17 +67,6 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
 
-    /*
-     * Actor-class authority matrix.
-     *
-     * SESSION_USER is deliberate. CURRENT_USER changes to the function owner
-     * inside SECURITY DEFINER execution and therefore must not be used for
-     * caller authorization.
-     *
-     * brktrkr_owner is NOT a universal fallback. In particular, transitive
-     * membership from brktrkr_migrator -> brktrkr_owner must not allow a
-     * migrator session to claim USER, ADMIN, or IMPORTER actor classes.
-     */
     IF v_actor_class = 'USER' THEN
         IF NOT pg_catalog.pg_has_role(
             SESSION_USER,
@@ -86,16 +85,6 @@ BEGIN
                 USING ERRCODE = '22004';
         END IF;
 
-        /*
-         * The trusted API authenticates the end user before this function is
-         * called. This lookup verifies only that the asserted BrickTrackr
-         * identity exists; account-state authorization remains the
-         * responsibility of higher-level API procedures.
-         *
-         * Because this function is SECURITY DEFINER and brktrkr_owner is
-         * NOBYPASSRLS, the identity.users owner policy must permit this lookup.
-         * The transaction-context validation suite verifies that assumption.
-         */
         SELECT EXISTS (
             SELECT 1
             FROM identity.users AS u
@@ -187,15 +176,6 @@ BEGIN
             USING ERRCODE = '22004';
     END IF;
 
-    /*
-     * trace_id is optional. When supplied it must:
-     *   - contain at least one non-whitespace character,
-     *   - contain no more than 128 PostgreSQL characters,
-     *   - contain no POSIX control characters.
-     *
-     * The original trace identifier is preserved exactly; trimming is used
-     * only for blank-value validation.
-     */
     IF p_trace_id IS NOT NULL THEN
         v_trace_id := p_trace_id;
 
@@ -220,11 +200,6 @@ BEGIN
         END IF;
     END IF;
 
-    /*
-     * All validation is complete before the first context mutation.
-     * The third argument is hard-coded TRUE, so all app.* values are local to
-     * the current transaction and disappear at COMMIT/ROLLBACK.
-     */
     PERFORM pg_catalog.set_config(
         'app.current_user_id',
         COALESCE(v_target_user::TEXT, ''),
@@ -251,7 +226,6 @@ BEGIN
 END;
 $function$;
 
--- Remove default PUBLIC execution immediately.
 REVOKE ALL
 ON FUNCTION app.set_request_context(UUID, UUID, TEXT, TEXT)
 FROM PUBLIC;
@@ -274,29 +248,10 @@ SECURITY INVOKER
 SET search_path = pg_catalog
 AS $function$
 BEGIN
-    PERFORM pg_catalog.set_config(
-        'app.current_user_id',
-        '',
-        TRUE
-    );
-
-    PERFORM pg_catalog.set_config(
-        'app.request_id',
-        '',
-        TRUE
-    );
-
-    PERFORM pg_catalog.set_config(
-        'app.trace_id',
-        '',
-        TRUE
-    );
-
-    PERFORM pg_catalog.set_config(
-        'app.actor_class',
-        '',
-        TRUE
-    );
+    PERFORM pg_catalog.set_config('app.current_user_id', '', TRUE);
+    PERFORM pg_catalog.set_config('app.request_id', '', TRUE);
+    PERFORM pg_catalog.set_config('app.trace_id', '', TRUE);
+    PERFORM pg_catalog.set_config('app.actor_class', '', TRUE);
 END;
 $function$;
 
@@ -323,20 +278,13 @@ SECURITY INVOKER
 SET search_path = pg_catalog
 AS $function$
     SELECT NULLIF(
-        pg_catalog.current_setting(
-            'app.current_user_id',
-            TRUE
-        ),
+        pg_catalog.current_setting('app.current_user_id', TRUE),
         ''
     )::UUID;
 $function$;
 
 ALTER FUNCTION identity.current_user_id()
 OWNER TO brktrkr_owner;
-
-COMMENT ON FUNCTION identity.current_user_id()
-IS
-'Returns the transaction-local BrickTrackr user UUID, or NULL when no user context is established.';
 
 CREATE OR REPLACE FUNCTION app.current_request_id()
 RETURNS UUID
@@ -346,20 +294,13 @@ SECURITY INVOKER
 SET search_path = pg_catalog
 AS $function$
     SELECT NULLIF(
-        pg_catalog.current_setting(
-            'app.request_id',
-            TRUE
-        ),
+        pg_catalog.current_setting('app.request_id', TRUE),
         ''
     )::UUID;
 $function$;
 
 ALTER FUNCTION app.current_request_id()
 OWNER TO brktrkr_owner;
-
-COMMENT ON FUNCTION app.current_request_id()
-IS
-'Returns the transaction-local BrickTrackr request UUID, or NULL when no request context is established.';
 
 CREATE OR REPLACE FUNCTION app.current_trace_id()
 RETURNS TEXT
@@ -369,20 +310,13 @@ SECURITY INVOKER
 SET search_path = pg_catalog
 AS $function$
     SELECT NULLIF(
-        pg_catalog.current_setting(
-            'app.trace_id',
-            TRUE
-        ),
+        pg_catalog.current_setting('app.trace_id', TRUE),
         ''
     );
 $function$;
 
 ALTER FUNCTION app.current_trace_id()
 OWNER TO brktrkr_owner;
-
-COMMENT ON FUNCTION app.current_trace_id()
-IS
-'Returns the transaction-local BrickTrackr trace identifier, or NULL when no trace context is established.';
 
 CREATE OR REPLACE FUNCTION app.current_actor_class()
 RETURNS TEXT
@@ -392,20 +326,13 @@ SECURITY INVOKER
 SET search_path = pg_catalog
 AS $function$
     SELECT NULLIF(
-        pg_catalog.current_setting(
-            'app.actor_class',
-            TRUE
-        ),
+        pg_catalog.current_setting('app.actor_class', TRUE),
         ''
     );
 $function$;
 
 ALTER FUNCTION app.current_actor_class()
 OWNER TO brktrkr_owner;
-
-COMMENT ON FUNCTION app.current_actor_class()
-IS
-'Returns the transaction-local BrickTrackr actor class (USER, ADMIN, IMPORTER, SYSTEM), or NULL when no actor context is established.';
 
 -- =============================================================================
 -- 4. Strict user-context enforcement helper
@@ -436,13 +363,30 @@ $function$;
 ALTER FUNCTION identity.require_current_user_id()
 OWNER TO brktrkr_owner;
 
-COMMENT ON FUNCTION identity.require_current_user_id()
-IS
-'Returns the current BrickTrackr user UUID and raises SQLSTATE 22004 when transaction-local user context is absent.';
+-- =============================================================================
+-- 5. Deterministic schema/routine privileges
+-- =============================================================================
 
--- =============================================================================
--- 5. Deterministic execution privileges
--- =============================================================================
+/*
+ * PostgreSQL requires schema USAGE in addition to routine EXECUTE.
+ * These grants permit request-context routine resolution only.
+ */
+GRANT USAGE
+ON SCHEMA app, identity
+TO
+    brktrkr_api,
+    brktrkr_admin,
+    brktrkr_import,
+    brktrkr_migrator,
+    brktrkr_owner;
+
+REVOKE CREATE
+ON SCHEMA app, identity
+FROM
+    brktrkr_api,
+    brktrkr_admin,
+    brktrkr_import,
+    brktrkr_migrator;
 
 REVOKE ALL
 ON FUNCTION app.set_request_context(UUID, UUID, TEXT, TEXT)
@@ -470,46 +414,16 @@ TO
     brktrkr_migrator,
     brktrkr_owner;
 
-/*
- * Observational getters are intentionally PUBLIC for use by RLS and policy
- * expressions. They expose only transaction-local context already present in
- * the caller's backend and do not grant authority.
- */
-REVOKE ALL
-ON FUNCTION identity.current_user_id()
-FROM PUBLIC;
+REVOKE ALL ON FUNCTION identity.current_user_id() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.current_request_id() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.current_trace_id() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.current_actor_class() FROM PUBLIC;
 
-REVOKE ALL
-ON FUNCTION app.current_request_id()
-FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION identity.current_user_id() TO PUBLIC;
+GRANT EXECUTE ON FUNCTION app.current_request_id() TO PUBLIC;
+GRANT EXECUTE ON FUNCTION app.current_trace_id() TO PUBLIC;
+GRANT EXECUTE ON FUNCTION app.current_actor_class() TO PUBLIC;
 
-REVOKE ALL
-ON FUNCTION app.current_trace_id()
-FROM PUBLIC;
-
-REVOKE ALL
-ON FUNCTION app.current_actor_class()
-FROM PUBLIC;
-
-GRANT EXECUTE
-ON FUNCTION identity.current_user_id()
-TO PUBLIC;
-
-GRANT EXECUTE
-ON FUNCTION app.current_request_id()
-TO PUBLIC;
-
-GRANT EXECUTE
-ON FUNCTION app.current_trace_id()
-TO PUBLIC;
-
-GRANT EXECUTE
-ON FUNCTION app.current_actor_class()
-TO PUBLIC;
-
-/*
- * Strict throwing getter remains limited to BrickTrackr capability roles.
- */
 REVOKE ALL
 ON FUNCTION identity.require_current_user_id()
 FROM PUBLIC;
@@ -527,6 +441,8 @@ TO
 -- 6. Completion marker
 -- =============================================================================
 
-SELECT pg_temp.bt_mark_completed('5000_function/5700_system/5709_system_request_context.sql');
+SELECT pg_temp.bt_mark_completed(
+    '5000_function/5700_system/5709_system_request_context.sql'
+);
 
-\echo '[PASS] 5709_system_request_context.sql installed successfully.'
+\echo '[PASS] 5709_system_request_context.sql v1.1.0 installed successfully.'

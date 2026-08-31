@@ -1,3 +1,18 @@
+﻿-- File Version: 1.3.0
+/*
+ * BT TEST FIXTURE TRANSPORT v1.3.0
+ *
+ * psql variables are not substituted inside dollar-quoted PL/pgSQL bodies.
+ * Materialize the fixture UUID before any SQL in this file is parsed.
+ *
+ * FALSE is intentional: bt.test_user_id is test-only session metadata and
+ * must survive COMMIT/ROLLBACK while app.* transaction-local context is tested.
+ */
+SELECT pg_catalog.set_config(
+    'bt.test_user_id',
+    :'user_id',
+    FALSE
+);
 \set ON_ERROR_STOP on
 
 \if :{?user_id}
@@ -14,7 +29,16 @@ SELECT pg_catalog.pg_backend_pid() AS initial_backend_pid \gset
  * 1. Autocommit wipe
  * ------------------------------------------------------------------------- */
 SELECT app.set_request_context(
-    :'user_id'::uuid,
+/*
+ * BT TEST FIXTURE TRANSPORT v1.1.0
+ *
+ * psql variables are not substituted inside dollar-quoted PL/pgSQL bodies.
+ * Materialize the fixture UUID into a test-only session GUC before any DO
+ * blocks. FALSE is intentional here: bt.test_user_id is test harness metadata,
+ * not BrickTrackr request context, and must survive COMMIT/ROLLBACK throughout
+ * this behavioral suite.
+ */
+pg_catalog.current_setting('bt.test_user_id')::uuid,
     '00000000-0000-7000-8000-00000000b001'::uuid,
     'direct-autocommit',
     'USER'
@@ -38,15 +62,15 @@ SELECT (
  * ------------------------------------------------------------------------- */
 BEGIN;
 SELECT app.set_request_context(
-    :'user_id'::uuid,
+    pg_catalog.current_setting('bt.test_user_id')::uuid,
     '00000000-0000-7000-8000-00000000b002'::uuid,
     'direct-a',
     'USER'
 );
 
 SELECT (
-    identity.current_user_id() = :'user_id'::uuid
-    AND identity.require_current_user_id() = :'user_id'::uuid
+    identity.current_user_id() = pg_catalog.current_setting('bt.test_user_id')::uuid
+    AND identity.require_current_user_id() = pg_catalog.current_setting('bt.test_user_id')::uuid
     AND app.current_request_id() = '00000000-0000-7000-8000-00000000b002'::uuid
     AND app.current_trace_id() = 'direct-a'
     AND app.current_actor_class() = 'USER'
@@ -60,7 +84,7 @@ SELECT (
 
 SAVEPOINT s1;
 SELECT app.set_request_context(
-    :'user_id'::uuid,
+    pg_catalog.current_setting('bt.test_user_id')::uuid,
     '00000000-0000-7000-8000-00000000b003'::uuid,
     'direct-b',
     'USER'
@@ -104,7 +128,7 @@ SELECT (
 \endif
 
 SELECT app.set_request_context(
-    :'user_id'::uuid,
+    pg_catalog.current_setting('bt.test_user_id')::uuid,
     '00000000-0000-7000-8000-00000000b004'::uuid,
     NULL,
     'user'
@@ -129,7 +153,7 @@ SELECT (
  * ------------------------------------------------------------------------- */
 BEGIN;
 SELECT app.set_request_context(
-    :'user_id'::uuid,
+    pg_catalog.current_setting('bt.test_user_id')::uuid,
     '00000000-0000-7000-8000-00000000b005'::uuid,
     'direct-rollback',
     'USER'
@@ -153,7 +177,7 @@ SELECT (
  * ------------------------------------------------------------------------- */
 BEGIN;
 SELECT app.set_request_context(
-    :'user_id'::uuid,
+    pg_catalog.current_setting('bt.test_user_id')::uuid,
     '00000000-0000-7000-8000-00000000b006'::uuid,
     'direct-error',
     'USER'
@@ -181,7 +205,7 @@ SELECT (
  * ------------------------------------------------------------------------- */
 BEGIN;
 SELECT app.set_request_context(
-    :'user_id'::uuid,
+    pg_catalog.current_setting('bt.test_user_id')::uuid,
     '00000000-0000-7000-8000-00000000b007'::uuid,
     'direct-valid',
     'USER'
@@ -213,7 +237,7 @@ BEGIN
 
     BEGIN
         PERFORM app.set_request_context(
-            :'user_id'::uuid,
+            pg_catalog.current_setting('bt.test_user_id')::uuid,
             NULL,
             'bad-null-request',
             'USER'
@@ -224,7 +248,7 @@ BEGIN
 
     BEGIN
         PERFORM app.set_request_context(
-            :'user_id'::uuid,
+            pg_catalog.current_setting('bt.test_user_id')::uuid,
             '00000000-0000-7000-8000-00000000c003'::uuid,
             '   ',
             'USER'
@@ -235,7 +259,7 @@ BEGIN
 
     BEGIN
         PERFORM app.set_request_context(
-            :'user_id'::uuid,
+            pg_catalog.current_setting('bt.test_user_id')::uuid,
             '00000000-0000-7000-8000-00000000c004'::uuid,
             pg_catalog.repeat('x', 129),
             'USER'
@@ -246,7 +270,7 @@ BEGIN
 
     BEGIN
         PERFORM app.set_request_context(
-            :'user_id'::uuid,
+            pg_catalog.current_setting('bt.test_user_id')::uuid,
             '00000000-0000-7000-8000-00000000c005'::uuid,
             E'bad\ntrace',
             'USER'
@@ -257,7 +281,7 @@ BEGIN
 
     BEGIN
         PERFORM app.set_request_context(
-            :'user_id'::uuid,
+            pg_catalog.current_setting('bt.test_user_id')::uuid,
             '00000000-0000-7000-8000-00000000c006'::uuid,
             'bad-actor',
             'NOT_A_REAL_ACTOR'
@@ -269,7 +293,7 @@ END;
 $do$;
 
 SELECT (
-    identity.current_user_id() = :'user_id'::uuid
+    identity.current_user_id() = pg_catalog.current_setting('bt.test_user_id')::uuid
     AND app.current_request_id() = '00000000-0000-7000-8000-00000000b007'::uuid
     AND app.current_trace_id() = 'direct-valid'
     AND app.current_actor_class() = 'USER'
@@ -307,3 +331,5 @@ END;
 $do$;
 
 \echo '[PASS] Direct-backend transaction-context behavioral suite.'
+
+
