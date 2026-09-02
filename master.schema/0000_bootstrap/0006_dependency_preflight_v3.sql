@@ -2,7 +2,7 @@
 ===============================================================================
  File:           0000_bootstrap/0006_dependency_preflight_v3.sql
  Project:        BrickTrackr
- Schema Version: 1.3.0
+ Schema Version: 1.3.1
  PostgreSQL:     16+
  Purpose:        Extend the generated dependency gate with additive v3 files
                  without rewriting the stable base dependency manifest.
@@ -34,8 +34,11 @@ VALUES
     (1014,'5000_function/5200_api/5270_api_market_reporting.sql',ARRAY['identity.current_user_id()','identity.can_view_owner()','catalog.items','catalog.part_variants','marketplace.market_price_observations','reference.external_sources','collection.entries','import.source_runs']::text[]),
     (1015,'5000_function/5700_system/5710_system_anonymous_request_context.sql',ARRAY['5000_function/5700_system/5709_system_request_context.sql','brktrkr_api role']::text[]),
     (1016,'5000_function/5200_api/5280_api_admin_finance.sql',ARRAY['admin.assert_system_admin()','admin.set_catalog_item_image()','admin.remove_catalog_item_image()','admin.set_instruction_asset()','admin.remove_instruction_asset()','admin.post_financial_transaction()','identity.current_user_id_optional()','reference.external_sources','catalog.items','catalog.sets','catalog.parts','catalog.minifigures','catalog.mocs','catalog.admin_overrides','import.jobs','import.source_runs','audit.events','audit.changes','finance.transactions','finance.ledger_entries','finance.source_events']::text[]),
+    (1021,'5000_function/5100_admin/5131_admin_finance_actor.sql',ARRAY['5000_function/5100_admin/5130_admin_finance.sql','identity.users','finance.accounts','finance.transactions','finance.ledger_entries','pgcrypto']::text[]),
+    (1022,'5000_function/5200_api/5281_api_admin_finance_actor.sql',ARRAY['5000_function/5200_api/5280_api_admin_finance.sql','5000_function/5100_admin/5131_admin_finance_actor.sql','admin.assert_system_admin()','identity.users','identity.owners','reference.external_sources','catalog.items','catalog.admin_overrides','import.jobs','finance.transactions','finance.ledger_entries']::text[]),
+    (1023,'5000_function/5200_api/5290_api_visibility_reads.sql',ARRAY['identity.current_user_id_optional()','identity.can_view_owner()','identity.can_view_family_shared_owner()','catalog.items','catalog.minifigures','definition.custom_minifigs','definition.inventory_definitions','definition.inventory_versions','definition.minifig_compositions','definition.minifig_structural_components','definition.minifig_accessories','api.inventory_graph_json()','moc.mocs','moc.revisions','moc.assets','moc.licenses','moc.subassemblies','moc.forks','wanted.wishlists','wanted.wishlist_entries','marketplace.market_price_observations']::text[]),
     (1017,'1100_security/1113_api_v3_rls.sql',ARRAY['collection.collections','collection.collection_memberships','definition.custom_minifigs','identity.current_user_id()','identity.can_view_owner()','identity.can_manage_owner()','identity.can_view_family_shared_owner()']::text[]),
-    (1018,'1100_security/1114_api_v3_execute.sql',ARRAY['1100_security/1110_api_surface_lockdown.sql','api.admin_finance_operation()','brktrkr_admin role']::text[]),
+    (1018,'1100_security/1114_api_v3_execute.sql',ARRAY['1100_security/1110_api_surface_lockdown.sql','api.admin_finance_actor_operation()','brktrkr_admin role']::text[]),
     (1019,'1200_validation/1227_api_v3_validation.sql',ARRAY['1100_security/1114_api_v3_execute.sql','1100_security/1113_api_v3_rls.sql','1100_security/1110_api_surface_lockdown.sql','5000_function/5700_system/5710_system_anonymous_request_context.sql']::text[]),
     (1020,'5000_function/5900_tests/5914_test_api_v3.sql',ARRAY['1200_validation/1227_api_v3_validation.sql','5000_function/5200_api/5230_api_collection_inventory.sql','5000_function/5200_api/5240_api_wanted.sql','5000_function/5200_api/5250_api_moc_minifig.sql','5000_function/5200_api/5260_api_identity_activity.sql']::text[])
 ON CONFLICT (file_path) DO UPDATE
@@ -67,6 +70,7 @@ SET dependencies=ARRAY[
     '5000_function/5200_api/5250_api_moc_minifig.sql',
     '5000_function/5200_api/5260_api_identity_activity.sql',
     '5000_function/5200_api/5270_api_market_reporting.sql',
+    '5000_function/5200_api/5290_api_visibility_reads.sql',
     '5000_function/5100_admin/5120_admin_definition_graph.sql',
     '5000_function/5100_admin/5130_admin_finance.sql',
     '5000_function/5000_importer/5000_importer_common.sql',
@@ -83,5 +87,5 @@ SELECT pg_temp.bt_preflight(
     ARRAY['0000_bootstrap/0000_dependency_preflight.sql']::text[]
 );
 
-\echo '[PASS] 0006_dependency_preflight_v3.sql'
+\echo '[PASS] 0006_dependency_preflight_v3.sql v1.3.1'
 SELECT pg_temp.bt_mark_completed('0000_bootstrap/0006_dependency_preflight_v3.sql');
