@@ -2,7 +2,7 @@
 ===============================================================================
  File:           5000_function/5100_admin/5131_admin_finance_actor.sql
  Project:        LEGO Collection Platform
- Schema Version: 1.3.0
+ Schema Version: 1.3.1
  PostgreSQL:     16+
  Purpose:        Add an administrator financial-posting overload that accepts
                  an explicitly authenticated BrickTrackr actor without placing
@@ -18,7 +18,9 @@
                  app.current_user_id. The HTTP-authenticated BrickTrackr admin
                  user is passed explicitly for durable financial attribution.
                  Idempotency, balancing, currency, and append-only guarantees
-                 are identical to the existing posting routine.
+                 are identical to the existing posting routine. Object ownership
+                 is assigned later by the canonical 1111 ownership-separation
+                 stage, consistent with other pre-role function files.
 ===============================================================================
 */
 \set ON_ERROR_STOP on
@@ -181,15 +183,6 @@ EXCEPTION
 END;
 $$;
 
-ALTER FUNCTION admin.post_financial_transaction(
-    text,
-    app.currency_code,
-    text,
-    jsonb,
-    uuid,
-    uuid
-) OWNER TO brktrkr_owner;
-
 REVOKE ALL ON FUNCTION admin.post_financial_transaction(
     text,
     app.currency_code,
@@ -207,7 +200,7 @@ COMMENT ON FUNCTION admin.post_financial_transaction(
     uuid,
     uuid
 ) IS
-'Posts one balanced idempotent financial transaction with an explicitly authenticated BrickTrackr administrator actor while preserving ADMIN database request-context separation.';
+'Posts one balanced idempotent financial transaction with an explicitly authenticated BrickTrackr administrator actor while preserving ADMIN database request-context separation. Ownership is normalized by 1111_role_ownership_separation.sql.';
 
 SELECT pg_temp.bt_mark_completed('5000_function/5100_admin/5131_admin_finance_actor.sql');
-\echo '[PASS] 5131_admin_finance_actor.sql'
+\echo '[PASS] 5131_admin_finance_actor.sql v1.3.1'
