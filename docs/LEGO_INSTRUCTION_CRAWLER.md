@@ -16,7 +16,7 @@
 ## Dependencies
 
 ```powershell
-pip install "psycopg[binary]" requests
+uv sync
 ```
 
 ## Database connection
@@ -134,8 +134,8 @@ The LEGO fetch path now uses Playwright/Chromium instead of `requests`.
 Install dependencies:
 
 ```powershell
-pip install "psycopg[binary]" playwright
-python -m playwright install chromium
+uv sync
+uv run playwright install chromium
 ```
 
 Run normally:

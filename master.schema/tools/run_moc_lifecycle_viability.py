@@ -311,10 +311,10 @@ SELECT EXISTS (
         "kind": "foundation",
         "sql": """
 SELECT (
-    NOT has_table_privilege('lego_api','moc.mocs','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_app','moc.mocs','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_api','moc.revisions','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_app','moc.revisions','INSERT,UPDATE,DELETE')
+    NOT has_table_privilege('brktrkr_api','moc.mocs','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','moc.mocs','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','moc.revisions','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','moc.revisions','INSERT,UPDATE,DELETE')
 )::int;
 """,
         "pass": "Runtime roles remain execute-only for MOC lifecycle data.",

@@ -76,7 +76,7 @@ DECLARE
     v_role text;
     v_rel text;
 BEGIN
-    FOREACH v_role IN ARRAY ARRAY['lego_api', 'lego_app']
+    FOREACH v_role IN ARRAY ARRAY['brktrkr_api']
     LOOP
         FOREACH v_rel IN ARRAY ARRAY[
             'app.schema_migration_baseline',

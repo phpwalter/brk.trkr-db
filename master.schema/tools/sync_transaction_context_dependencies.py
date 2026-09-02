@@ -37,7 +37,7 @@ HELPER = ROOT / "0000_bootstrap/0000_dependency_preflight.sql"
 BOOTSTRAP = ROOT / "bootstrap.sql"
 
 CONTEXT = "5000_function/5700_system/5709_system_request_context.sql"
-TEST5979 = "5000_function/5900_tests/5979_test_system_request_context.sql"
+TEST5900 = "5000_function/5900_tests/5900_test_app_lifecycle.sql"
 VALID1217 = "1200_validation/1217_pgbouncer_transaction_context_validation.sql"
 
 FILES = {
@@ -46,7 +46,7 @@ FILES = {
         "0100_identity/0100_users.sql",
         "1100_security/1100_roles.sql",
     ],
-    TEST5979: [CONTEXT],
+    TEST5900: [CONTEXT, "0000_bootstrap/0005_migration_framework.sql"],
     VALID1217: [CONTEXT],
 }
 

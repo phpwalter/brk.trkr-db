@@ -36,11 +36,11 @@ SELECT app.assert_true(
 
 SELECT app.assert_true(
     has_function_privilege(
-        'lego_importer',
+        'brktrkr_import',
         'import.reconcile_rebrickable_sticker_sheets(uuid)',
         'EXECUTE'
     ),
-    'lego_importer cannot execute automatic Rebrickable sticker-sheet reconciliation'
+    'brktrkr_import cannot execute automatic Rebrickable sticker-sheet reconciliation'
 );
 
 SELECT app.assert_true(
@@ -49,28 +49,28 @@ SELECT app.assert_true(
 );
 
 SELECT app.assert_true(
-    NOT has_table_privilege('lego_importer','definition.set_manifest_components','INSERT')
-    AND NOT has_table_privilege('lego_importer','definition.set_manifest_components','UPDATE')
-    AND NOT has_table_privilege('lego_importer','definition.set_manifest_components','DELETE'),
-    'lego_importer must not have direct DML on definition.set_manifest_components'
+    NOT has_table_privilege('brktrkr_import','definition.set_manifest_components','INSERT')
+    AND NOT has_table_privilege('brktrkr_import','definition.set_manifest_components','UPDATE')
+    AND NOT has_table_privilege('brktrkr_import','definition.set_manifest_components','DELETE'),
+    'brktrkr_import must not have direct DML on definition.set_manifest_components'
 );
 
 SELECT app.assert_true(
     has_function_privilege(
-        'lego_importer',
+        'brktrkr_import',
         'import.upsert_set_manifest_component(text,text,text,text,text,text,integer,jsonb)',
         'EXECUTE'
     ),
-    'lego_importer cannot execute approved manifest enrichment upsert'
+    'brktrkr_import cannot execute approved manifest enrichment upsert'
 );
 
 SELECT app.assert_true(
     has_function_privilege(
-        'lego_importer',
+        'brktrkr_import',
         'import.mark_set_manifest_component_missing(text,text,text,text)',
         'EXECUTE'
     ),
-    'lego_importer cannot execute approved manifest missing-state routine'
+    'brktrkr_import cannot execute approved manifest missing-state routine'
 );
 
 SELECT app.assert_true(

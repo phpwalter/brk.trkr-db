@@ -494,10 +494,10 @@ SELECT (
         "kind": "foundation",
         "sql": """
 SELECT (
-    NOT has_table_privilege('lego_api','catalog.sets','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_app','catalog.sets','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_api','definition.inventory_versions','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_app','definition.inventory_versions','INSERT,UPDATE,DELETE')
+    NOT has_table_privilege('brktrkr_api','catalog.sets','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','catalog.sets','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','definition.inventory_versions','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','definition.inventory_versions','INSERT,UPDATE,DELETE')
 )::int;
 """,
         "pass": "Runtime users remain execute-only for canonical set and manifest data.",

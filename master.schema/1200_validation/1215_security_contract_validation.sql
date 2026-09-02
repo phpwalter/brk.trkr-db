@@ -40,8 +40,8 @@ SELECT pg_temp.bt_preflight('1200_validation/1215_security_contract_validation.s
 /* -------------------------------------------------------------------------
  * Contract constants
  * -------------------------------------------------------------------------
- * lego_api is the preferred runtime role.
- * lego_app is retained only as an execute-only compatibility runtime role.
+ * brktrkr_api is the preferred runtime role.
+ * brktrkr_api is retained only as an execute-only compatibility runtime role.
  * Neither role may directly access application tables or sequences.
  * ------------------------------------------------------------------------- */
 
@@ -50,7 +50,7 @@ DO $$
 DECLARE
     v_role text;
 BEGIN
-    FOREACH v_role IN ARRAY ARRAY['lego_api', 'lego_app']
+    FOREACH v_role IN ARRAY ARRAY['brktrkr_api']
     LOOP
         PERFORM app.assert_true(
             EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_role),
@@ -86,7 +86,7 @@ DECLARE
     v_role text;
     v_owned bigint;
 BEGIN
-    FOREACH v_role IN ARRAY ARRAY['lego_api', 'lego_app']
+    FOREACH v_role IN ARRAY ARRAY['brktrkr_api']
     LOOP
         SELECT count(*)
           INTO v_owned
@@ -150,7 +150,7 @@ DECLARE
     v_relation record;
     v_violations text[] := ARRAY[]::text[];
 BEGIN
-    FOREACH v_role IN ARRAY ARRAY['lego_api', 'lego_app']
+    FOREACH v_role IN ARRAY ARRAY['brktrkr_api']
     LOOP
         FOR v_relation IN
             SELECT c.oid, n.nspname, c.relname
@@ -194,7 +194,7 @@ DECLARE
     v_sequence record;
     v_violations text[] := ARRAY[]::text[];
 BEGIN
-    FOREACH v_role IN ARRAY ARRAY['lego_api', 'lego_app']
+    FOREACH v_role IN ARRAY ARRAY['brktrkr_api']
     LOOP
         FOR v_sequence IN
             SELECT c.oid, n.nspname, c.relname
@@ -234,7 +234,7 @@ DECLARE
     v_schema record;
     v_violations text[] := ARRAY[]::text[];
 BEGIN
-    FOREACH v_role IN ARRAY ARRAY['lego_api', 'lego_app']
+    FOREACH v_role IN ARRAY ARRAY['brktrkr_api']
     LOOP
         FOR v_schema IN
             SELECT oid, nspname
@@ -277,8 +277,8 @@ SELECT app.assert_true(
           JOIN pg_namespace n ON n.oid = p.pronamespace
          WHERE n.nspname = 'api'
            AND (
-               has_function_privilege('lego_api', p.oid, 'EXECUTE')
-               OR has_function_privilege('lego_app', p.oid, 'EXECUTE')
+               has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
+               OR has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
            )
            AND (
                NOT p.prosecdef
@@ -352,8 +352,8 @@ SELECT app.assert_true(
           FROM pg_auth_members m
           JOIN pg_roles child_role ON child_role.oid = m.member
           JOIN pg_roles parent_role ON parent_role.oid = m.roleid
-         WHERE child_role.rolname IN ('lego_api','lego_app')
-           AND parent_role.rolname IN ('lego_admin','lego_importer','lego_reporting')
+         WHERE child_role.rolname IN ('brktrkr_api')
+           AND parent_role.rolname IN ('brktrkr_admin','brktrkr_import','brktrkr_reporting')
     ),
     'Runtime role inherits an elevated admin/importer/reporting role'
 );
@@ -364,11 +364,11 @@ SELECT app.assert_true(
     EXISTS (
         SELECT 1
           FROM pg_roles
-         WHERE rolname = 'lego_admin'
+         WHERE rolname = 'brktrkr_admin'
            AND NOT rolcanlogin
-           AND rolbypassrls
+           AND NOT rolbypassrls
     ),
-    'lego_admin must remain a separate NOLOGIN BYPASSRLS group role'
+    'brktrkr_admin must remain a separate NOLOGIN NOBYPASSRLS group role'
 );
 
 
@@ -377,7 +377,7 @@ SELECT app.assert_true(
  * ==========================================================================
  * Reads and writes are deliberately separated:
  *   - only identity.current_user_id[_optional]() may READ the identity GUC;
- *   - only app.set_authenticated_user(uuid) may WRITE the identity GUC.
+ *   - only app.set_request_context(uuid,uuid,text,text) may WRITE the identity GUC.
  *
  * This makes the request-identity boundary mechanically reviewable while still
  * allowing trusted middleware to establish transaction-local identity through
@@ -391,10 +391,14 @@ SELECT app.assert_true(
          WHERE p.prosrc ~* 'current_setting[[:space:]]*\([[:space:]]*''app\.current_user_id'''
            AND NOT (
                n.nspname = 'identity'
-               AND p.proname IN ('current_user_id', 'current_user_id_optional')
+               AND p.proname IN ('current_user_id', 'current_user_id_optional', 'require_current_user_id')
+           )
+           AND NOT (
+               n.nspname = 'audit'
+               AND p.proname = 'capture_row_change'
            )
     ),
-    'A database routine reads app.current_user_id outside the canonical identity helpers'
+    'A database routine reads app.current_user_id outside the canonical identity helpers or the audit trigger'
 );
 
 SELECT app.assert_true(
@@ -405,12 +409,20 @@ SELECT app.assert_true(
          WHERE p.prosrc ~* 'set_config[[:space:]]*\([[:space:]]*''app\.current_user_id'''
            AND NOT (
                n.nspname = 'app'
-               AND p.proname = 'set_authenticated_user'
-               AND p.pronargs = 1
+               AND p.proname = 'set_request_context'
+               AND p.pronargs = 4
                AND p.proargtypes[0] = 'uuid'::regtype
+               AND p.proargtypes[1] = 'uuid'::regtype
+               AND p.proargtypes[2] = 'text'::regtype
+               AND p.proargtypes[3] = 'text'::regtype
+           )
+           AND NOT (
+               n.nspname = 'app'
+               AND p.proname = 'clear_request_context'
+               AND p.pronargs = 0
            )
     ),
-    'A database routine writes app.current_user_id outside app.set_authenticated_user(uuid)'
+    'A database routine writes app.current_user_id outside app.set_request_context(uuid,uuid,text,text) or app.clear_request_context()'
 );
 
 
@@ -572,8 +584,8 @@ SELECT app.assert_true(
           JOIN pg_namespace n ON n.oid = p.pronamespace
          WHERE n.nspname = 'api'
            AND (
-               has_function_privilege('lego_api', p.oid, 'EXECUTE')
-               OR has_function_privilege('lego_app', p.oid, 'EXECUTE')
+               has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
+               OR has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
            )
            AND EXISTS (
                SELECT 1

@@ -54,8 +54,8 @@ SELECT app.assert_true(
         JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'admin'
           AND (
-              has_function_privilege('lego_api', p.oid, 'EXECUTE')
-              OR has_function_privilege('lego_app', p.oid, 'EXECUTE')
+              has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
+              OR has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
           )
     ),
     'Runtime roles must not execute admin.* routines'

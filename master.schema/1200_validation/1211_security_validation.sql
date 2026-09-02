@@ -23,9 +23,9 @@ DECLARE
     v_role text;
 BEGIN
     FOREACH v_role IN ARRAY ARRAY[
-        'lego_app',
-        'lego_admin',
-        'lego_importer'
+        'brktrkr_api',
+        'brktrkr_admin',
+        'brktrkr_import'
     ]
     LOOP
         PERFORM app.assert_true(
@@ -39,23 +39,23 @@ BEGIN
     END LOOP;
 
     PERFORM app.assert_true(
-        NOT (SELECT rolcanlogin FROM pg_roles WHERE rolname = 'lego_app'),
-        'lego_app must remain a NOLOGIN group role'
+        NOT (SELECT rolcanlogin FROM pg_roles WHERE rolname = 'brktrkr_api'),
+        'brktrkr_api must remain a NOLOGIN group role'
     );
 
     PERFORM app.assert_true(
-        NOT (SELECT rolbypassrls FROM pg_roles WHERE rolname = 'lego_app'),
-        'lego_app must not have BYPASSRLS'
+        NOT (SELECT rolbypassrls FROM pg_roles WHERE rolname = 'brktrkr_api'),
+        'brktrkr_api must not have BYPASSRLS'
     );
 
     PERFORM app.assert_true(
-        (SELECT rolbypassrls FROM pg_roles WHERE rolname = 'lego_admin'),
-        'lego_admin is expected to have BYPASSRLS'
+        NOT (SELECT rolbypassrls FROM pg_roles WHERE rolname = 'brktrkr_admin'),
+        'brktrkr_admin must not have BYPASSRLS'
     );
 
     PERFORM app.assert_true(
-        (SELECT rolbypassrls FROM pg_roles WHERE rolname = 'lego_importer'),
-        'lego_importer is expected to have BYPASSRLS'
+        NOT (SELECT rolbypassrls FROM pg_roles WHERE rolname = 'brktrkr_import'),
+        'brktrkr_import must not have BYPASSRLS'
     );
 END;
 $$;
@@ -83,14 +83,14 @@ SELECT app.assert_true(
               'import'
           )
           AND (
-              has_table_privilege('lego_app', c.oid, 'SELECT')
-              OR has_table_privilege('lego_app', c.oid, 'INSERT')
-              OR has_table_privilege('lego_app', c.oid, 'UPDATE')
-              OR has_table_privilege('lego_app', c.oid, 'DELETE')
+              has_table_privilege('brktrkr_api', c.oid, 'SELECT')
+              OR has_table_privilege('brktrkr_api', c.oid, 'INSERT')
+              OR has_table_privilege('brktrkr_api', c.oid, 'UPDATE')
+              OR has_table_privilege('brktrkr_api', c.oid, 'DELETE')
           )
           AND NOT c.relrowsecurity
     ),
-    'lego_app has access to one or more private-domain tables without RLS'
+    'brktrkr_api has access to one or more private-domain tables without RLS'
 );
 
 
@@ -205,7 +205,7 @@ SELECT app.assert_true(
 );
 
 
-/* Every RLS table directly usable by lego_app must have at least one policy. */
+/* Every RLS table directly usable by brktrkr_api must have at least one policy. */
 SELECT app.assert_true(
     NOT EXISTS (
         SELECT 1
@@ -223,7 +223,7 @@ SELECT app.assert_true(
               'moc',
               'import'
           )
-          AND has_table_privilege('lego_app', c.oid, 'SELECT')
+          AND has_table_privilege('brktrkr_api', c.oid, 'SELECT')
           AND NOT EXISTS (
               SELECT 1
               FROM pg_policy p
@@ -306,13 +306,13 @@ SELECT app.assert_true(
         WHERE n.nspname = 'audit'
           AND c.relname IN ('events', 'changes')
           AND (
-              has_table_privilege('lego_app', c.oid, 'SELECT')
-              OR has_table_privilege('lego_app', c.oid, 'INSERT')
-              OR has_table_privilege('lego_app', c.oid, 'UPDATE')
-              OR has_table_privilege('lego_app', c.oid, 'DELETE')
+              has_table_privilege('brktrkr_api', c.oid, 'SELECT')
+              OR has_table_privilege('brktrkr_api', c.oid, 'INSERT')
+              OR has_table_privilege('brktrkr_api', c.oid, 'UPDATE')
+              OR has_table_privilege('brktrkr_api', c.oid, 'DELETE')
           )
     ),
-    'lego_app must not have direct audit-table privileges'
+    'brktrkr_api must not have direct audit-table privileges'
 );
 
 \echo '[VALIDATE PASS] 1211_security_validation.sql'

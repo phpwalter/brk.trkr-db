@@ -1,0 +1,2 @@
+$env:PGPASSWORD = 'root'
+.\tools\run_full_verification_suite.ps1

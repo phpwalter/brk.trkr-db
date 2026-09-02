@@ -49,7 +49,7 @@ def main() -> int:
     # Operational group roles must never be made members of owner/deployer in source.
     forbidden = re.compile(
         r"GRANT\s+(?:brktrkr_owner|brktrkr_migrator)\s+TO\s+"
-        r"(?:lego_api|lego_app|lego_admin|lego_importer|lego_reporting)\b",
+        r"(?:brktrkr_api|brktrkr_admin|brktrkr_import|brktrkr_reporting)\b",
         re.I
     )
     for p in ROOT.rglob("*.sql"):

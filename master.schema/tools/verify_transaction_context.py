@@ -23,6 +23,11 @@ Intentional exceptions:
     3. 5000_function/5100_admin/*.sql
        may write app.actor_class for transaction-local ADMIN audit provenance.
 
+    4. 5000_function/5900_tests/5901_test_identity_lifecycle.sql
+       may write a malformed raw app.current_user_id GUC value to prove
+       identity.current_user_id() fails closed (SQLSTATE 28000) instead of
+       silently accepting corrupt context.
+
 Hard failures:
     * set_config(..., FALSE) for any request-context GUC.
     * direct SET / SET LOCAL of request-context GUCs.
@@ -47,6 +52,7 @@ ADMIN_PREFIX = "5000_function/5100_admin/"
 VALIDATION_ALLOWLIST = {
     "1200_validation/1215_security_contract_validation.sql",
     "1200_validation/1216_adversarial_authorization_validation.sql",
+    "5000_function/5900_tests/5901_test_identity_lifecycle.sql",
 }
 
 CONTEXT_KEYS = {

@@ -21,23 +21,23 @@ SELECT app.assert_true(
 );
 
 SELECT app.assert_true(
-    NOT has_table_privilege('lego_api', 'app.runtime_api_allowlist', 'SELECT')
-    AND NOT has_table_privilege('lego_api', 'app.runtime_api_allowlist', 'INSERT')
-    AND NOT has_table_privilege('lego_api', 'app.runtime_api_allowlist', 'UPDATE')
-    AND NOT has_table_privilege('lego_api', 'app.runtime_api_allowlist', 'DELETE')
-    AND NOT has_table_privilege('lego_app', 'app.runtime_api_allowlist', 'SELECT')
-    AND NOT has_table_privilege('lego_app', 'app.runtime_api_allowlist', 'INSERT')
-    AND NOT has_table_privilege('lego_app', 'app.runtime_api_allowlist', 'UPDATE')
-    AND NOT has_table_privilege('lego_app', 'app.runtime_api_allowlist', 'DELETE'),
+    NOT has_table_privilege('brktrkr_api', 'app.runtime_api_allowlist', 'SELECT')
+    AND NOT has_table_privilege('brktrkr_api', 'app.runtime_api_allowlist', 'INSERT')
+    AND NOT has_table_privilege('brktrkr_api', 'app.runtime_api_allowlist', 'UPDATE')
+    AND NOT has_table_privilege('brktrkr_api', 'app.runtime_api_allowlist', 'DELETE')
+    AND NOT has_table_privilege('brktrkr_api', 'app.runtime_api_allowlist', 'SELECT')
+    AND NOT has_table_privilege('brktrkr_api', 'app.runtime_api_allowlist', 'INSERT')
+    AND NOT has_table_privilege('brktrkr_api', 'app.runtime_api_allowlist', 'UPDATE')
+    AND NOT has_table_privilege('brktrkr_api', 'app.runtime_api_allowlist', 'DELETE'),
     'Runtime roles must not read or mutate app.runtime_api_allowlist'
 );
 
 /* Runtime roles may resolve api.* names, but may never CREATE there. */
 SELECT app.assert_true(
-    has_schema_privilege('lego_api', 'api', 'USAGE')
-    AND has_schema_privilege('lego_app', 'api', 'USAGE')
-    AND NOT has_schema_privilege('lego_api', 'api', 'CREATE')
-    AND NOT has_schema_privilege('lego_app', 'api', 'CREATE'),
+    has_schema_privilege('brktrkr_api', 'api', 'USAGE')
+    AND has_schema_privilege('brktrkr_api', 'api', 'USAGE')
+    AND NOT has_schema_privilege('brktrkr_api', 'api', 'CREATE')
+    AND NOT has_schema_privilege('brktrkr_api', 'api', 'CREATE'),
     'Runtime roles require api USAGE and must not have api CREATE'
 );
 
@@ -78,8 +78,8 @@ SELECT app.assert_true(
         JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'api'
           AND (
-              has_function_privilege('lego_api', p.oid, 'EXECUTE')
-              OR has_function_privilege('lego_app', p.oid, 'EXECUTE')
+              has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
+              OR has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
           )
         EXCEPT
         SELECT routine_signature
@@ -97,8 +97,8 @@ SELECT app.assert_true(
         FROM pg_proc p
         JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'api'
-          AND has_function_privilege('lego_api', p.oid, 'EXECUTE')
-          AND has_function_privilege('lego_app', p.oid, 'EXECUTE')
+          AND has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
+          AND has_function_privilege('brktrkr_api', p.oid, 'EXECUTE')
     ),
     'An allowlisted api.* routine is not executable by both runtime roles'
 );
@@ -111,7 +111,7 @@ SELECT app.assert_true(
         JOIN pg_proc p ON p.oid = to_regprocedure(a.routine_signature)
         JOIN pg_roles owner_role ON owner_role.oid = p.proowner
         WHERE NOT p.prosecdef
-           OR owner_role.rolname IN ('lego_api', 'lego_app')
+           OR owner_role.rolname IN ('brktrkr_api')
            OR NOT EXISTS (
                 SELECT 1
                 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) cfg
@@ -178,7 +178,7 @@ SELECT app.assert_true(
               WHERE d.defaclrole = p.proowner
                 AND d.defaclnamespace = 0
                 AND d.defaclobjtype = 'f'
-                AND grantee_role.rolname IN ('lego_api', 'lego_app')
+                AND grantee_role.rolname IN ('brktrkr_api')
                 AND acl.privilege_type = 'EXECUTE'
           )
     ),
@@ -200,19 +200,19 @@ BEGIN
     LOOP
         PERFORM app.assert_true(
             has_function_privilege(
-                'lego_api',
+                'brktrkr_api',
                 to_regprocedure(v_signature),
                 'EXECUTE'
             ),
-            format('lego_api lacks reviewed routine %s', v_signature)
+            format('brktrkr_api lacks reviewed routine %s', v_signature)
         );
         PERFORM app.assert_true(
             has_function_privilege(
-                'lego_app',
+                'brktrkr_api',
                 to_regprocedure(v_signature),
                 'EXECUTE'
             ),
-            format('lego_app lacks reviewed routine %s', v_signature)
+            format('brktrkr_api lacks reviewed routine %s', v_signature)
         );
     END LOOP;
 END

@@ -18,5 +18,5 @@ The full-refresh orchestrator calls
 `import.reconcile_rebrickable_sticker_sheets(source_run_id)` automatically after
 Phase 5B.
 
-No direct canonical DML is granted to `lego_importer`; the reconciliation
+No direct canonical DML is granted to `brktrkr_import`; the reconciliation
 function is SECURITY DEFINER and checks importer membership.

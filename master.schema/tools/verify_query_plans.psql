@@ -1,0 +1,179 @@
+/*
+===============================================================================
+ File:    master.schema/tools/verify_query_plans.psql
+ Purpose: Production-equivalent query-plan verification for the 12 critical
+          indexes reviewed in 1200_validation/1221_operational_integrity_validation.sql.
+
+          1221 proves each critical index exists, is valid, and has not had its
+          leading columns silently changed. This file proves each index is
+          actually usable by the query shape it was built for: with sequential
+          scans and explicit sorts disabled, the planner must still be able to
+          reach the named index for a representative query on that access path.
+          A failure here means the index and its documented purpose have
+          drifted apart, even though 1221's static structural check still
+          passes.
+
+          Run via: tools/verify_schema_contract.py --database <dsn> --query-plans
+          Invoked directly, this file expects ON_ERROR_STOP and a database
+          with the master schema already installed (schema shape only; no
+          real data is required, since EXPLAIN without ANALYZE never executes
+          the query).
+===============================================================================
+*/
+
+\set ON_ERROR_STOP on
+\echo '[RUN ] Query-plan contract'
+
+BEGIN;
+SET LOCAL enable_seqscan = off;
+SET LOCAL enable_sort = off;
+
+DO $$
+DECLARE
+    v_plan jsonb;
+BEGIN
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM identity.user_sessions
+        WHERE user_id = '00000000-0000-0000-0000-000000000000'::uuid
+          AND expires_at > now()
+          AND revoked_at IS NULL
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_user_sessions_active',
+        'active session lookup does not reach ix_user_sessions_active'
+    );
+
+    -- Deliberately not 'ACTIVE': that value is also served by the narrower
+    -- partial unique index uq_active_family_membership_pair, which the
+    -- planner correctly prefers for an ACTIVE-only lookup. 'REMOVED' can
+    -- only be served by ix_family_memberships_family, making this the
+    -- discriminating check for that index specifically.
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM identity.family_memberships
+        WHERE family_id = '00000000-0000-0000-0000-000000000000'::uuid
+          AND membership_status = 'REMOVED'
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_family_memberships_family',
+        'family membership authorization lookup does not reach ix_family_memberships_family'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM catalog.items
+        WHERE item_kind = 'SET' AND status = 'ACTIVE'
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_catalog_items_kind_status',
+        'catalog browse/filter does not reach ix_catalog_items_kind_status'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM collection.entries
+        WHERE owner_id = '00000000-0000-0000-0000-000000000000'::uuid
+          AND status = 'ACTIVE'
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_collection_entries_owner',
+        'owner collection browse does not reach ix_collection_entries_owner'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM collection.instances
+        WHERE collection_entry_id = '00000000-0000-0000-0000-000000000000'::uuid
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_collection_instances_entry',
+        'entry instance expansion does not reach ix_collection_instances_entry'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM wanted.wishlist_entries
+        WHERE wishlist_id = '00000000-0000-0000-0000-000000000000'::uuid
+          AND status = 'ACTIVE'
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_wishlist_entries_wishlist',
+        'wishlist browse does not reach ix_wishlist_entries_wishlist'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM moc.revisions
+        WHERE moc_id = '00000000-0000-0000-0000-000000000000'::uuid
+        ORDER BY revision_number DESC
+        LIMIT 1
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_moc_revisions_moc',
+        'latest MOC revision lookup does not reach ix_moc_revisions_moc'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM import.jobs
+        WHERE owner_id = '00000000-0000-0000-0000-000000000000'::uuid
+        ORDER BY created_at DESC
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_import_jobs_owner',
+        'owner import history does not reach ix_import_jobs_owner'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM audit.events
+        WHERE entity_schema = 'catalog'
+          AND entity_table = 'items'
+          AND entity_id = '00000000-0000-0000-0000-000000000000'
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_audit_events_entity',
+        'entity audit history does not reach ix_audit_events_entity'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM operations.jobs
+        WHERE status = 'QUEUED'
+        ORDER BY priority DESC, available_at, created_at
+        LIMIT 1
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_operations_jobs_dispatch',
+        'queued job dispatch does not reach ix_operations_jobs_dispatch'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM finance.ledger_entries
+        WHERE financial_account_id = '00000000-0000-0000-0000-000000000000'::uuid
+        ORDER BY created_at DESC
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_finance_ledger_account',
+        'account ledger history does not reach ix_finance_ledger_account'
+    );
+
+    EXECUTE $q$
+        EXPLAIN (FORMAT JSON)
+        SELECT 1 FROM marketplace.listings
+        WHERE seller_owner_id = '00000000-0000-0000-0000-000000000000'::uuid
+          AND status = 'ACTIVE'
+        ORDER BY created_at DESC
+    $q$ INTO v_plan;
+    PERFORM app.assert_true(
+        v_plan::text ~* 'ix_marketplace_listings_seller_status',
+        'seller listing browse does not reach ix_marketplace_listings_seller_status'
+    );
+END;
+$$;
+
+ROLLBACK;
+
+\echo '[PASS] Query-plan contract'

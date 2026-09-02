@@ -56,6 +56,6 @@ pending migrations.
 ## Deployment role requirement
 
 The login used by `tools/apply_migrations.py` must be granted membership in
-`lego_deployer`. The migration runner executes schema changes with `SET ROLE lego_owner`.
+`brktrkr_migrator`. The migration runner executes schema changes with `SET ROLE brktrkr_owner`.
 Normal runtime, admin, importer, and reporting logins must never be members of
-`lego_deployer` or `lego_owner`.
+`brktrkr_migrator` or `brktrkr_owner`.

@@ -9,6 +9,9 @@ Repository root assumed:
 1. Greenfield schema build: `master.schema\install_bricktrackr_greenfield.ps1`
 2. Initial Rebrickable data load: `run_rebrickable_initial_load.ps1`
 3. Nightly Rebrickable refresh: `run_rebrickable_nightly.ps1`
+4. Full non-destructive verification (existing database): `master.schema\tools\verify_schema_contract.py` (`--query-plans --lifecycle-viability` for the full suite), `master.schema\tools\run_stored_procedure_tests.py`, `tools\test_transaction_context.ps1`, `tools\test_admin_user_reads.ps1`, `tools\test_admin_user_writes.ps1`
+5. Live role-model reconciliation (existing database): `tools\apply_role_model.ps1`
+6. Full verification suite from empty (single command, disposable database): `tools\run_full_verification_suite.ps1` -- runs everything in item 4 above end to end against a throwaway database it creates and drops itself, stopping at the first failure with the reason. Requires `$env:PGPASSWORD` set to the local Postgres admin ("root") password.
 
 Optional one-time scheduler registration: `register_rebrickable_nightly_task.ps1`
 
@@ -30,8 +33,23 @@ master.schema\install_bricktrackr_greenfield.ps1
   -> master.schema\tools\verify_dependencies.py
   -> psql: CREATE/DROP database
   -> master.schema\bootstrap.sql
-       -> the 135 dependency-managed SQL files below, in manifest/bootstrap order
+       -> the 163 dependency-managed SQL files below, in bootstrap \ir order
   -> installer smoke checks
+```
+
+The last 14 files (149-162) are the `5000_function\5900_tests\*.sql` regression
+suite, one file per schema (app/identity/reference/catalog/definition/
+collection/wanted/moc/audit/import/api/admin/finance/reporting). They run
+automatically as part of every greenfield bootstrap, not just via the
+standalone test runner in section 4 below — a fresh install is not considered
+successful unless they pass too.
+
+This list is generated directly from `master.schema\bootstrap.sql`'s `\ir`
+directives; regenerate it (don't hand-edit) whenever a file is added, removed,
+or reordered:
+
+```powershell
+python -c "import re; text=open(r'master.schema\bootstrap.sql').read(); [print(f'{i:03d}. `master.schema\{f.replace(chr(47), chr(92))}`') for i,f in enumerate(re.findall(r'^\s*\\ir\s+(\S+)', text, re.M), 1)]"
 ```
 
 ### Complete greenfield SQL file order
@@ -87,92 +105,120 @@ master.schema\install_bricktrackr_greenfield.ps1
 049. `master.schema\0400_definitions\0404_definition_authority.sql`
 050. `master.schema\0400_definitions\0405_manifest_graph.sql`
 051. `master.schema\0400_definitions\0406_minifig_compositions.sql`
-052. `master.schema\1200_validation\1204_definition_validation.sql`
-053. `master.schema\0500_collections\0500_storage_locations.sql`
-054. `master.schema\0500_collections\0501_collection_entries.sql`
-055. `master.schema\0500_collections\0502_collection_instances.sql`
-056. `master.schema\0500_collections\0503_instance_adjustments.sql`
-057. `master.schema\0500_collections\0504_storage_allocations.sql`
-058. `master.schema\0500_collections\0505_transfers.sql`
-059. `master.schema\0500_collections\0506_acquisitions.sql`
-060. `master.schema\0500_collections\0507_tags.sql`
-061. `master.schema\1200_validation\1205_collection_validation.sql`
-062. `master.schema\0600_wanted\0600_wishlists.sql`
-063. `master.schema\0600_wanted\0601_wishlist_entries.sql`
-064. `master.schema\0600_wanted\0602_wishlist_reservations.sql`
-065. `master.schema\0600_wanted\0603_build_goals.sql`
-066. `master.schema\0600_wanted\0604_build_allocations.sql`
-067. `master.schema\1200_validation\1206_wanted_validation.sql`
-068. `master.schema\0700_mocs\0700_mocs.sql`
-069. `master.schema\0700_mocs\0701_moc_revisions.sql`
-070. `master.schema\0700_mocs\0702_moc_forks.sql`
-071. `master.schema\0700_mocs\0703_moc_subassemblies.sql`
-072. `master.schema\0700_mocs\0704_moc_licenses.sql`
-073. `master.schema\0700_mocs\0705_moc_assets.sql`
-074. `master.schema\1200_validation\1207_moc_validation.sql`
-075. `master.schema\0750_marketplace\0750_market_prices.sql`
-076. `master.schema\0750_marketplace\0751_marketplace.sql`
-077. `master.schema\0760_finance\0760_financial_ledger.sql`
-078. `master.schema\0760_finance\0761_financial_readiness_anchors.sql`
-079. `master.schema\0800_imports\0800_import_jobs.sql`
-080. `master.schema\0800_imports\0801_source_runs.sql`
-081. `master.schema\0800_imports\0802_raw_staging.sql`
-082. `master.schema\0800_imports\0803_source_run_datasets.sql`
-083. `master.schema\0800_imports\0804_normalized_records.sql`
-084. `master.schema\0800_imports\0805_import_matches.sql`
-085. `master.schema\0800_imports\0806_user_mapping_suggestions.sql`
-086. `master.schema\0800_imports\0807_import_applications.sql`
-087. `master.schema\1200_validation\1208_import_validation.sql`
-088. `master.schema\0850_operations\0850_jobs_notifications.sql`
-089. `master.schema\0900_audit\0900_audit_events.sql`
-090. `master.schema\0900_audit\0901_audit_changes.sql`
-091. `master.schema\1200_validation\1209_audit_validation.sql`
-092. `master.schema\1000_function\1000_identity_function.sql`
-093. `master.schema\1000_function\1001_hierarchy_function.sql`
-094. `master.schema\1000_function\1002_catalog_function.sql`
-095. `master.schema\1000_function\1003_definition_function.sql`
-096. `master.schema\1000_function\1004_collection_function.sql`
-097. `master.schema\1000_function\1005_wanted_function.sql`
-098. `master.schema\1000_function\1006_moc_function.sql`
-099. `master.schema\1000_function\1007_import_function.sql`
-100. `master.schema\1000_function\1008_audit_function.sql`
-101. `master.schema\1000_function\1009_integrity_hardening.sql`
-102. `master.schema\1000_function\1010_moc_access_function.sql`
-103. `master.schema\1000_function\1011_request_context.sql`
-104. `master.schema\1000_function\1012_graph_function.sql`
-105. `master.schema\1000_function\1013_operational_api.sql`
-106. `master.schema\1000_function\1014_finance_function.sql`
-107. `master.schema\1000_function\1015_rebrickable_reference_reconcile.sql`
-108. `master.schema\1000_function\1016_rebrickable_catalog_reconcile.sql`
-109. `master.schema\1000_function\1020_fail_source_run.sql`
-110. `master.schema\1200_validation\1210_function_validation.sql`
-111. `master.schema\1050_reporting\1050_reporting_views.sql`
-112. `master.schema\1100_security\1100_roles.sql`
-113. `master.schema\1100_security\1101_rls_identity.sql`
-114. `master.schema\1100_security\1102_rls_collections.sql`
-115. `master.schema\1100_security\1103_rls_wanted.sql`
-116. `master.schema\1100_security\1104_rls_mocs.sql`
-117. `master.schema\1100_security\1105_rls_imports.sql`
-118. `master.schema\1100_security\1106_rls_audit.sql`
-119. `master.schema\1100_security\1108_rls_catalog_definition.sql`
-120. `master.schema\1100_security\1109_rls_extended.sql`
-121. `master.schema\1100_security\1107_grants.sql`
-122. `master.schema\1100_security\1110_api_surface_lockdown.sql`
-123. `master.schema\1100_security\1111_role_ownership_separation.sql`
-124. `master.schema\1200_validation\1211_security_validation.sql`
-125. `master.schema\1200_validation\1212_integrity_validation.sql`
-126. `master.schema\1200_validation\1214_extended_architecture_validation.sql`
-127. `master.schema\1200_validation\1215_security_contract_validation.sql`
-128. `master.schema\1200_validation\1216_adversarial_authorization_validation.sql`
-129. `master.schema\1200_validation\1217_pgbouncer_transaction_context_validation.sql`
-130. `master.schema\1200_validation\1218_api_surface_validation.sql`
-131. `master.schema\1200_validation\1219_migration_framework_validation.sql`
-132. `master.schema\1200_validation\1220_financial_readiness_validation.sql`
-133. `master.schema\1200_validation\1221_operational_integrity_validation.sql`
-134. `master.schema\1200_validation\1222_role_separation_validation.sql`
-135. `master.schema\1200_validation\1213_dependency_validation.sql`
+052. `master.schema\0400_definitions\0410_set_manifest_components.sql`
+053. `master.schema\1200_validation\1204_definition_validation.sql`
+054. `master.schema\0500_collections\0500_storage_locations.sql`
+055. `master.schema\0500_collections\0501_collection_entries.sql`
+056. `master.schema\0500_collections\0502_collection_instances.sql`
+057. `master.schema\0500_collections\0503_instance_adjustments.sql`
+058. `master.schema\0500_collections\0504_storage_allocations.sql`
+059. `master.schema\0500_collections\0505_transfers.sql`
+060. `master.schema\0500_collections\0506_acquisitions.sql`
+061. `master.schema\0500_collections\0507_tags.sql`
+062. `master.schema\1200_validation\1205_collection_validation.sql`
+063. `master.schema\0600_wanted\0600_wishlists.sql`
+064. `master.schema\0600_wanted\0601_wishlist_entries.sql`
+065. `master.schema\0600_wanted\0602_wishlist_reservations.sql`
+066. `master.schema\0600_wanted\0603_build_goals.sql`
+067. `master.schema\0600_wanted\0604_build_allocations.sql`
+068. `master.schema\1200_validation\1206_wanted_validation.sql`
+069. `master.schema\0700_mocs\0700_mocs.sql`
+070. `master.schema\0700_mocs\0701_moc_revisions.sql`
+071. `master.schema\0700_mocs\0702_moc_forks.sql`
+072. `master.schema\0700_mocs\0703_moc_subassemblies.sql`
+073. `master.schema\0700_mocs\0704_moc_licenses.sql`
+074. `master.schema\0700_mocs\0705_moc_assets.sql`
+075. `master.schema\1200_validation\1207_moc_validation.sql`
+076. `master.schema\0750_marketplace\0750_market_prices.sql`
+077. `master.schema\0750_marketplace\0751_marketplace.sql`
+078. `master.schema\0760_finance\0760_financial_ledger.sql`
+079. `master.schema\0760_finance\0761_financial_readiness_anchors.sql`
+080. `master.schema\0800_imports\0800_import_jobs.sql`
+081. `master.schema\0800_imports\0801_source_runs.sql`
+082. `master.schema\0800_imports\0802_raw_staging.sql`
+083. `master.schema\0800_imports\0803_source_run_datasets.sql`
+084. `master.schema\0800_imports\0804_normalized_records.sql`
+085. `master.schema\0800_imports\0805_import_matches.sql`
+086. `master.schema\0800_imports\0806_user_mapping_suggestions.sql`
+087. `master.schema\0800_imports\0807_import_applications.sql`
+088. `master.schema\1200_validation\1208_import_validation.sql`
+089. `master.schema\0850_operations\0850_jobs_notifications.sql`
+090. `master.schema\0900_audit\0900_audit_events.sql`
+091. `master.schema\0900_audit\0901_audit_changes.sql`
+092. `master.schema\1200_validation\1209_audit_validation.sql`
+093. `master.schema\5000_function\5700_system\5700_system_identity.sql`
+094. `master.schema\5000_function\5700_system\5701_system_hierarchy.sql`
+095. `master.schema\5000_function\5700_system\5702_system_catalog.sql`
+096. `master.schema\5000_function\5700_system\5703_system_definition.sql`
+097. `master.schema\5000_function\5700_system\5704_system_collection.sql`
+098. `master.schema\5000_function\5700_system\5705_system_wanted.sql`
+099. `master.schema\5000_function\5700_system\5706_system_moc.sql`
+100. `master.schema\5000_function\5000_importer\5000_importer_common.sql`
+101. `master.schema\5000_function\5700_system\5707_system_audit.sql`
+102. `master.schema\5000_function\5700_system\5708_system_integrity_hardening.sql`
+103. `master.schema\5000_function\5200_api\5200_api_moc_access.sql`
+104. `master.schema\5000_function\5100_admin\5120_admin_definition_graph.sql`
+105. `master.schema\5000_function\5200_api\5210_api_operational.sql`
+106. `master.schema\5000_function\5100_admin\5130_admin_finance.sql`
+107. `master.schema\5000_function\5000_importer\5010_importer_rebrickable_reference_reconcile.sql`
+108. `master.schema\5000_function\5000_importer\5011_importer_rebrickable_catalog_reconcile.sql`
+109. `master.schema\5000_function\5000_importer\5012_importer_fail_source_run.sql`
+110. `master.schema\1000_reporting\1000_reporting_views.sql`
+111. `master.schema\1100_security\1100_roles.sql`
+112. `master.schema\5000_function\5700_system\5709_system_request_context.sql`
+113. `master.schema\5000_function\5100_admin\5100_admin_common.sql`
+114. `master.schema\5000_function\5100_admin\5110_admin_catalog_lifecycle.sql`
+115. `master.schema\1200_validation\1210_function_validation.sql`
+116. `master.schema\1100_security\1101_rls_identity.sql`
+117. `master.schema\1100_security\1102_rls_collections.sql`
+118. `master.schema\1100_security\1103_rls_wanted.sql`
+119. `master.schema\1100_security\1104_rls_mocs.sql`
+120. `master.schema\1100_security\1105_rls_imports.sql`
+121. `master.schema\1100_security\1106_rls_audit.sql`
+122. `master.schema\1100_security\1108_rls_catalog_definition.sql`
+123. `master.schema\1100_security\1109_rls_extended.sql`
+124. `master.schema\1100_security\1107_grants.sql`
+125. `master.schema\1100_security\1110_api_surface_lockdown.sql`
+126. `master.schema\1000_reporting\1010_reporting_system_summary.sql`
+127. `master.schema\1000_reporting\1011_reporting_aggregate_tables.sql`
+128. `master.schema\5000_function\5000_importer\5030_importer_set_manifest_enrichment.sql`
+129. `master.schema\5000_function\5400_reporting\5410_reporting_set_manifest_enrichment.sql`
+130. `master.schema\1100_security\1111_role_ownership_separation.sql`
+131. `master.schema\5000_function\5100_admin\5140_users.sql`
+132. `master.schema\5000_function\5100_admin\5150_audit.sql`
+133. `master.schema\1100_security\1112_admin_execute_only.sql`
+134. `master.schema\1200_validation\1211_security_validation.sql`
+135. `master.schema\1200_validation\1212_integrity_validation.sql`
+136. `master.schema\1200_validation\1214_extended_architecture_validation.sql`
+137. `master.schema\1200_validation\1215_security_contract_validation.sql`
+138. `master.schema\1200_validation\1216_adversarial_authorization_validation.sql`
+139. `master.schema\1200_validation\1217_pgbouncer_transaction_context_validation.sql`
+140. `master.schema\1200_validation\1218_api_surface_validation.sql`
+141. `master.schema\1200_validation\1219_migration_framework_validation.sql`
+142. `master.schema\1200_validation\1220_financial_readiness_validation.sql`
+143. `master.schema\1200_validation\1221_operational_integrity_validation.sql`
+144. `master.schema\1200_validation\1222_role_separation_validation.sql`
+145. `master.schema\1200_validation\1223_admin_catalog_lifecycle_validation.sql`
+146. `master.schema\1200_validation\1224_system_summary_validation.sql`
+147. `master.schema\1200_validation\1225_aggregate_tables_validation.sql`
+148. `master.schema\1200_validation\1226_set_manifest_enrichment_validation.sql`
+149. `master.schema\5000_function\5900_tests\5900_test_app_lifecycle.sql`
+150. `master.schema\5000_function\5900_tests\5901_test_identity_lifecycle.sql`
+151. `master.schema\5000_function\5900_tests\5902_test_reference_lifecycle.sql`
+152. `master.schema\5000_function\5900_tests\5903_test_catalog_lifecycle.sql`
+153. `master.schema\5000_function\5900_tests\5904_test_definition_lifecycle.sql`
+154. `master.schema\5000_function\5900_tests\5905_test_collection_lifecycle.sql`
+155. `master.schema\5000_function\5900_tests\5906_test_wanted_lifecycle.sql`
+156. `master.schema\5000_function\5900_tests\5907_test_moc_lifecycle.sql`
+157. `master.schema\5000_function\5900_tests\5908_test_audit_lifecycle.sql`
+158. `master.schema\5000_function\5900_tests\5909_test_import_lifecycle.sql`
+159. `master.schema\5000_function\5900_tests\5910_test_api_lifecycle.sql`
+160. `master.schema\5000_function\5900_tests\5911_test_admin_lifecycle.sql`
+161. `master.schema\5000_function\5900_tests\5912_test_finance_lifecycle.sql`
+162. `master.schema\5000_function\5900_tests\5913_test_reporting_lifecycle.sql`
+163. `master.schema\1200_validation\1213_dependency_validation.sql`
 
-Also required by greenfield but not counted among the 135:
+Also required by greenfield but not counted among the 172:
 
 - `master.schema\bootstrap.sql`
 - `master.schema\DEPENDENCY_MANIFEST.json`
@@ -180,7 +226,12 @@ Also required by greenfield but not counted among the 135:
 
 Recommended release/CI verifier, not called by normal greenfield installer:
 
-- `master.schema\tools\verify_schema_contract.py`
+- `master.schema\tools\verify_schema_contract.py` — static-only by default;
+  `--require-database` runs a full disposable-database bootstrap; add
+  `--query-plans` to also run `master.schema\tools\verify_query_plans.psql`
+  (production-equivalent index-usage checks); add `--require-pgbouncer` with
+  `BRICKTRACKR_PGBOUNCER_URL` set to also run the real PgBouncer
+  transaction-pooling contract.
 
 ---
 
@@ -226,6 +277,13 @@ Required Rebrickable import files:
 - `import\reconcile_rebrickable_phase5b_checkpointed.py`
 - `import\import_rebrickable_phase6a_relationships.py`
 - `import\reconcile_rebrickable_phase6b_relationships.py`
+
+Python dependencies (`psycopg[binary]`, `requests`) are declared in
+`pyproject.toml` and locked in `uv.lock`. Provision the `.venv` with:
+
+```powershell
+uv sync
+```
 
 Fresh snapshot datasets downloaded every initial-load run:
 
@@ -275,6 +333,80 @@ Optional one-time Windows task registration:
 
 ---
 
+## 4. Full non-destructive verification (existing database)
+
+Run against any already-installed database (greenfield-only or already
+populated with real data). None of these steps drop, recreate, or otherwise
+mutate durable data — the SQL suites run inside `BEGIN...ROLLBACK`.
+
+```powershell
+# Static schema-contract checks (no database needed)
+python .\master.schema\tools\verify_schema_contract.py
+
+# Full 23-file stored-procedure regression suite
+python .\master.schema\tools\run_stored_procedure_tests.py --database "postgresql://<user>@<host>:5432/<database>"
+
+# Transaction-context / actor-class behavioral contract
+.\tools\test_transaction_context.ps1 -Database <database>
+
+# Admin user read/write contract (requires at least one identity.users row;
+# admin_user_reads.sql additionally requires a specific fixture user — see its
+# header for the exact username/UUID it expects)
+.\tools\test_admin_user_reads.ps1 -Database <database>
+.\tools\test_admin_user_writes.ps1 -Database <database>
+
+# Lifecycle-viability product-coverage reports (PARTIAL verdicts reflect
+# known/accepted feature gaps, not infrastructure bugs — see docs\*_LIFECYCLE_VIABILITY.md)
+python .\master.schema\tools\run_set_lifecycle_viability.py --database "postgresql://<user>@<host>:5432/<database>"
+python .\master.schema\tools\run_part_lifecycle_viability.py --database "postgresql://<user>@<host>:5432/<database>"
+python .\master.schema\tools\run_moc_lifecycle_viability.py --database "postgresql://<user>@<host>:5432/<database>"
+python .\master.schema\tools\run_minifig_lifecycle_viability.py --database "postgresql://<user>@<host>:5432/<database>"
+python .\master.schema\tools\run_wishlist_lifecycle_viability.py --database "postgresql://<user>@<host>:5432/<database>"
+```
+
+`tools\verify_bricktrackr.ps1` wraps the schema-contract check plus
+`tools\test_transaction_context.ps1` and `tools\test_admin_users.ps1` (which
+in turn wraps the two admin user scripts), but does not expose a `-Database`
+override for its children — run the component scripts directly against a
+non-default database name.
+
+Service login roles (`brktrkr_*_login`) must exist first:
+
+```powershell
+.\tools\create_db_service_accounts.ps1 -Database <database>
+```
+
+---
+
+## Role model
+
+BrickTrackr uses six canonical NOLOGIN capability roles, defined in
+`master.schema\1100_security\1100_roles.sql` and granted in
+`master.schema\1100_security\1107_grants.sql` /
+`master.schema\1100_security\1112_admin_execute_only.sql`:
+
+- `brktrkr_owner` — owns all application schemas/relations/routines. NOINHERIT.
+- `brktrkr_migrator` — the only group role permitted to assume `brktrkr_owner`
+  for migrations (`SET ROLE brktrkr_owner`, used by `tools\apply_migrations.py`).
+- `brktrkr_api` — runtime application access.
+- `brktrkr_admin` — execute-only administrative access (no direct table writes).
+- `brktrkr_import` — Rebrickable importer access.
+- `brktrkr_reporting` — read-only reporting access.
+
+Each capability role has a corresponding `brktrkr_*_login` LOGIN role created by
+`tools\create_db_service_accounts.ps1` and reconciled into the correct group
+membership by `tools\apply_role_model.ps1` (a live-reconciliation runner, not
+part of greenfield bootstrap — see its header for what it does and does not
+execute). `tools\verify_role_separation.py` performs static pre-install source
+checks against this model; `1222_role_separation_validation.sql` checks it at
+install/runtime.
+
+There is no `lego_*` role anywhere in the model — `lego_` prefixes elsewhere in
+this codebase (e.g. `catalog.lego_elements`, the LEGO instruction crawler) name
+the LEGO product domain, not a database role.
+
+---
+
 ## Files that are NOT human entry points
 
 Do not manually run the phase Python files during normal operations. They are called by `import\run_rebrickable_full_refresh.ps1`.
@@ -283,39 +415,12 @@ Do not manually run `master.schema\bootstrap.sql` during normal operations. It i
 
 ---
 
-## Redundant/history files from the uploaded tree
+## Legacy wrappers not required for the canonical workflows
 
-- `patch_canonical_phase5b.ps1`
-- `run_rebrickable_nightly_streaming.ps1`
-- `import\run_rebrickable_full_refresh_streaming.ps1`
-- `import\run_rebrickable_full_refresh_handoff.ps1`
-- `import\run_rebrickable_full_refresh_finalizing.ps1`
-- `import\run_rebrickable_full_refresh_resilient_fixed.ps1`
-- `import\rebuild_phase5b_run_checkpoint.ps1`
-- `import\rebuild_phase5b_run_checkpoint_v2.ps1`
-- `import\rebuild_phase5b_run_checkpoint_v3.ps1`
-- `import\rebuild_phase5b_run_checkpoint_v4.ps1`
-- `import\-SchemaRoot`
-- `master.schema\5000.zip`
-- `master.schema\db.zip`
-- `master.schema\1200_validation\master.schema.hardened-step1-fixed.zip`
-
-Also redundant/history:
-
-- every `*.bak`, `*.phase*.bak`, `*.pre*.bak` backup under `master.schema`
-- old runtime logs
-- old downloaded `.csv.gz` snapshot files
-
-They should be archived outside the active deployable tree, then deleted after validation.
-
----
-
-## Legacy wrappers not required for the three canonical workflows
-
-- `master.schema\bootstrap.bat`
-- `master.schema\bootstrap.ps1`
-- `master.schema\bootstrap_with_dependency_check.ps1`
-- `master.schema\verify.bat`
+- `master.schema\bootstrap.ps1` — interactive, password-prompting alternative
+  greenfield installer. Superseded by
+  `install_bricktrackr_greenfield.ps1` + `run_greenfield_build.ps1`, which
+  read the password from `$env:PGPASSWORD` instead of prompting.
 
 The canonical greenfield path is `master.schema\install_bricktrackr_greenfield.ps1 -> bootstrap.sql`.
 
@@ -335,9 +440,15 @@ cd L:\var\www\Brk.Trkr\brk.trkr-db
 # 3. Verify schema contract (release/CI gate)
 python .\master.schema\tools\verify_schema_contract.py
 
-# 4. Register nightly task once, if desired
+# 4. Full non-destructive verification against the populated database
+python .\master.schema\tools\run_stored_procedure_tests.py --database "postgresql://<user>@localhost:5432/bricktrackr"
+.\tools\test_transaction_context.ps1 -Database bricktrackr
+.\tools\test_admin_user_reads.ps1 -Database bricktrackr
+.\tools\test_admin_user_writes.ps1 -Database bricktrackr
+
+# 5. Register nightly task once, if desired
 .\register_rebrickable_nightly_task.ps1
 
-# 5. Thereafter nightly execution is only:
+# 6. Thereafter nightly execution is only:
 .\run_rebrickable_nightly.ps1
 ```

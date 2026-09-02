@@ -69,8 +69,7 @@ EXPECTED_ROUTINES = (
     "app.current_request_id()",
     "app.current_trace_id()",
     "app.current_actor_class()",
-    "app.set_authenticated_user(uuid)",
-    "app.set_request_context(uuid,text,text)",
+    "app.set_request_context(uuid,uuid,text,text)",
     "app.set_import_context(uuid)",
 )
 

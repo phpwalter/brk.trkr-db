@@ -29,23 +29,14 @@ SELECT pg_catalog.pg_backend_pid() AS initial_backend_pid \gset
  * 1. Autocommit wipe
  * ------------------------------------------------------------------------- */
 SELECT app.set_request_context(
-/*
- * BT TEST FIXTURE TRANSPORT v1.1.0
- *
- * psql variables are not substituted inside dollar-quoted PL/pgSQL bodies.
- * Materialize the fixture UUID into a test-only session GUC before any DO
- * blocks. FALSE is intentional here: bt.test_user_id is test harness metadata,
- * not BrickTrackr request context, and must survive COMMIT/ROLLBACK throughout
- * this behavioral suite.
- */
-pg_catalog.current_setting('bt.test_user_id')::uuid,
+    pg_catalog.current_setting('bt.test_user_id')::uuid,
     '00000000-0000-7000-8000-00000000b001'::uuid,
     'direct-autocommit',
     'USER'
 );
 
 SELECT (
-    identity.current_user_id() IS NULL
+    identity.current_user_id_optional() IS NULL
     AND app.current_request_id() IS NULL
     AND app.current_trace_id() IS NULL
     AND app.current_actor_class() IS NULL
@@ -115,7 +106,7 @@ SELECT app.clear_request_context();
 SELECT app.clear_request_context();
 
 SELECT (
-    identity.current_user_id() IS NULL
+    identity.current_user_id_optional() IS NULL
     AND app.current_request_id() IS NULL
     AND app.current_trace_id() IS NULL
     AND app.current_actor_class() IS NULL
@@ -137,7 +128,7 @@ COMMIT;
 
 /* COMMIT cleanup */
 SELECT (
-    identity.current_user_id() IS NULL
+    identity.current_user_id_optional() IS NULL
     AND app.current_request_id() IS NULL
     AND app.current_trace_id() IS NULL
     AND app.current_actor_class() IS NULL
@@ -161,7 +152,7 @@ SELECT app.set_request_context(
 ROLLBACK;
 
 SELECT (
-    identity.current_user_id() IS NULL
+    identity.current_user_id_optional() IS NULL
     AND app.current_request_id() IS NULL
     AND app.current_trace_id() IS NULL
     AND app.current_actor_class() IS NULL
@@ -189,7 +180,7 @@ SELECT 1 / 0;
 ROLLBACK;
 
 SELECT (
-    identity.current_user_id() IS NULL
+    identity.current_user_id_optional() IS NULL
     AND app.current_request_id() IS NULL
     AND app.current_trace_id() IS NULL
     AND app.current_actor_class() IS NULL

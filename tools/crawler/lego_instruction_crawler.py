@@ -22,7 +22,7 @@ PARSER_VERSION = "2.0-visible-booklets"
 
 BASE_URL = "https://www.lego.com/en-us/service/building-instructions"
 DEFAULT_READ_DSN = "postgresql://root:root@127.0.0.1:5432/bricktrackr"
-DEFAULT_IMPORT_DSN = "postgresql://bricktrackr_import:import@127.0.0.1:5432/bricktrackr"
+DEFAULT_IMPORT_DSN = "postgresql://brktrkr_import_login:import@127.0.0.1:5432/bricktrackr"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent

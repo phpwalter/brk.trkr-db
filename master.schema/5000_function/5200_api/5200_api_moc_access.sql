@@ -179,7 +179,7 @@ $$;
 
 /*
  * SECURITY DEFINER functions must not inherit the default PUBLIC EXECUTE grant.
- * 1107_grants.sql grants EXECUTE explicitly to lego_app and lego_admin.
+ * 1107_grants.sql grants EXECUTE explicitly to brktrkr_api and brktrkr_admin.
  */
 REVOKE ALL ON FUNCTION api.get_moc_by_id(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION api.get_moc_revisions(uuid) FROM PUBLIC;

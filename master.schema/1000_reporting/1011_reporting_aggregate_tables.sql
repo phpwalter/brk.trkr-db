@@ -1096,16 +1096,16 @@ REVOKE ALL ON FUNCTION reporting.get_catalog_kind_summary() FROM PUBLIC;
 REVOKE ALL ON FUNCTION reporting.get_owner_summary(uuid) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION import.get_system_summary()
-TO lego_importer;
+TO brktrkr_import;
 
 GRANT EXECUTE ON FUNCTION reporting.get_import_summary(integer)
-TO lego_api, lego_app, lego_reporting, lego_importer;
+TO brktrkr_api, brktrkr_reporting, brktrkr_import;
 
 GRANT EXECUTE ON FUNCTION reporting.get_catalog_kind_summary()
-TO lego_api, lego_app, lego_reporting, lego_importer;
+TO brktrkr_api, brktrkr_reporting, brktrkr_import;
 
 GRANT EXECUTE ON FUNCTION reporting.get_owner_summary(uuid)
-TO lego_api, lego_app, lego_reporting;
+TO brktrkr_api, brktrkr_reporting;
 
 
 /* -------------------------------------------------------------------------- */

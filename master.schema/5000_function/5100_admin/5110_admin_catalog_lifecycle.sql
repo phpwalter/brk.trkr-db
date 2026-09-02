@@ -14,7 +14,7 @@
                  admin.restore_catalog_item(...)
  Key Rules:      Canonical lifecycle logic is implemented once.
                  Runtime/admin callers never access catalog tables directly.
-                 Admin entry points require lego_admin membership.
+                 Admin entry points require brktrkr_admin membership.
                  A non-empty reason is mandatory for every lifecycle change.
                  SOURCE_MISSING remains importer-controlled.
                  UNRESOLVED_CUSTOM requires a dedicated resolution workflow.

@@ -87,12 +87,12 @@ SELECT app.assert_true(
 );
 
 SELECT app.assert_true(
-    EXISTS (SELECT 1 FROM pg_roles WHERE rolname='lego_api'),
-    'lego_api role is missing'
+    EXISTS (SELECT 1 FROM pg_roles WHERE rolname='brktrkr_api'),
+    'brktrkr_api role is missing'
 );
 SELECT app.assert_true(
-    EXISTS (SELECT 1 FROM pg_roles WHERE rolname='lego_reporting'),
-    'lego_reporting role is missing'
+    EXISTS (SELECT 1 FROM pg_roles WHERE rolname='brktrkr_reporting'),
+    'brktrkr_reporting role is missing'
 );
 
 DO $$
@@ -102,7 +102,7 @@ BEGIN
     SELECT count(*)
       INTO v_leak_count
       FROM information_schema.role_table_grants
-     WHERE grantee = 'lego_api'
+     WHERE grantee = 'brktrkr_api'
        AND table_schema IN (
            'identity','reference','catalog','definition','collection','wanted',
            'moc','import','audit','marketplace','finance','operations'
@@ -111,19 +111,19 @@ BEGIN
 
     PERFORM app.assert_true(
         v_leak_count = 0,
-        format('lego_api must be EXECUTE-only; found %s direct table grants', v_leak_count)
+        format('brktrkr_api must be EXECUTE-only; found %s direct table grants', v_leak_count)
     );
 END;
 $$;
 
 SELECT app.assert_true(
-    has_schema_privilege('lego_reporting','reporting','USAGE'),
-    'lego_reporting lacks reporting schema USAGE'
+    has_schema_privilege('brktrkr_reporting','reporting','USAGE'),
+    'brktrkr_reporting lacks reporting schema USAGE'
 );
 
 SELECT app.assert_true(
-    NOT has_schema_privilege('lego_reporting','collection','USAGE'),
-    'lego_reporting must not have collection schema USAGE'
+    NOT has_schema_privilege('brktrkr_reporting','collection','USAGE'),
+    'brktrkr_reporting must not have collection schema USAGE'
 );
 
 SELECT app.assert_function_exists('api.search_catalog(text,integer)');

@@ -90,7 +90,7 @@ try {
         $env:BRICKTRACKR_IMPORT_USER
     }
     else {
-        "bricktrackr_import"
+        "brktrkr_import_login"
     }
 
     # Secret resolution order:

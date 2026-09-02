@@ -351,7 +351,7 @@ def main():
                 cur.execute(
                     """
                     SELECT
-                        pg_has_role(%s::text, 'lego_importer', 'MEMBER'),
+                        pg_has_role(%s::text, 'brktrkr_import', 'MEMBER'),
                         has_schema_privilege(%s::text, 'import', 'USAGE')
                     """,
                     (login, login),
@@ -360,14 +360,14 @@ def main():
 
                 if not member:
                     raise RuntimeError(
-                        f"database login {login!r} is not a member of lego_importer"
+                        f"database login {login!r} is not a member of brktrkr_import"
                     )
                 if not import_usage:
                     raise RuntimeError(
                         f"database login {login!r} lacks USAGE on import"
                     )
 
-                cur.execute("SET ROLE lego_importer")
+                cur.execute("SET ROLE brktrkr_import")
 
                 cur.execute(
                     """

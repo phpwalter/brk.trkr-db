@@ -54,9 +54,9 @@ DECLARE
     v_manifest_links_retired integer := 0;
     v_retired_this_set integer := 0;
 BEGIN
-    IF NOT pg_has_role(session_user, 'lego_importer', 'MEMBER') THEN
+    IF NOT pg_has_role(session_user, 'brktrkr_import', 'MEMBER') THEN
         RAISE EXCEPTION
-            'import.reconcile_lego_instruction_batch requires lego_importer membership'
+            'import.reconcile_lego_instruction_batch requires brktrkr_import membership'
             USING ERRCODE = '42501';
     END IF;
 
@@ -418,6 +418,6 @@ FROM PUBLIC;
 
 GRANT EXECUTE
 ON FUNCTION import.reconcile_lego_instruction_batch(uuid,jsonb)
-TO lego_importer;
+TO brktrkr_import;
 
 \echo '[PASS] parser-v2 LEGO instruction reconciler installed'

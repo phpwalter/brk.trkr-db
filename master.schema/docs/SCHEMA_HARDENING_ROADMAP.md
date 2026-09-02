@@ -61,14 +61,14 @@ This file is the working implementation checklist for the ten schema-hardening i
    - Query-plan verification must be run against a production-equivalent PostgreSQL environment because planner decisions depend on PostgreSQL settings/statistics.
 
 9. **Runtime/admin/deployment role separation — COMPLETE**
-   - Added dedicated `lego_owner` and `lego_deployer` NOLOGIN roles.
-   - All application schemas, relations, routines, and standalone application types are transferred to `lego_owner`.
-   - `lego_deployer` is the only BrickTrackr group role allowed to assume `lego_owner`; runtime/admin/import/reporting roles are explicitly excluded.
+   - Added dedicated `brktrkr_owner` and `brktrkr_migrator` NOLOGIN roles.
+   - All application schemas, relations, routines, and standalone application types are transferred to `brktrkr_owner`.
+   - `brktrkr_migrator` is the only BrickTrackr group role allowed to assume `brktrkr_owner`; runtime/admin/import/reporting roles are explicitly excluded.
    - Existing BrickTrackr roles are reconciled to exact capability envelopes so stale SUPERUSER/CREATEROLE/CREATEDB/REPLICATION privileges cannot survive deployment.
    - Owner default privileges are deny-by-default; future grants to runtime/admin/import/reporting roles must be explicit in a reviewed migration.
    - `1222_role_separation_validation.sql` checks ownership, membership boundaries, schema CREATE denial, and owner default ACLs.
    - `tools/verify_role_separation.py` performs pre-install source checks.
-   - `tools/apply_migrations.py` now executes schema changes under `SET ROLE lego_owner`.
+   - `tools/apply_migrations.py` now executes schema changes under `SET ROLE brktrkr_owner`.
 
 10. **Single schema-contract CI entrypoint — IMPLEMENTED**
     - Added `tools/verify_schema_contract.py` as the single fail-closed promotion gate.
@@ -131,10 +131,10 @@ Operational integrity is now treated as a deployment contract rather than a best
 
 ## Step 9 implementation
 Object ownership is now a separate trust boundary rather than an accidental property of
-the bootstrap login. `lego_owner` is a NOLOGIN role that owns BrickTrackr application
-objects. `lego_deployer` is a separate NOLOGIN deployment group and is the only
-BrickTrackr group role permitted to assume `lego_owner`. Operational admin remains
+the bootstrap login. `brktrkr_owner` is a NOLOGIN role that owns BrickTrackr application
+objects. `brktrkr_migrator` is a separate NOLOGIN deployment group and is the only
+BrickTrackr group role permitted to assume `brktrkr_owner`. Operational admin remains
 powerful but is intentionally not an owner and cannot CREATE in application schemas.
-Future migrations execute under `SET ROLE lego_owner`, so newly-created objects inherit
+Future migrations execute under `SET ROLE brktrkr_owner`, so newly-created objects inherit
 the same ownership/default-privilege contract instead of being owned by whichever human
 or CI login happened to run the deployment.

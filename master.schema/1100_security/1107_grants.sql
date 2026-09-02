@@ -61,6 +61,17 @@ REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA
     reporting
 FROM PUBLIC;
 
+/* The observational request-context getters are intentionally PUBLIC so
+ * that RLS policies (evaluated under the querying role, not brktrkr_owner)
+ * can call them. Re-grant after the blanket deny-by-default revoke above.
+ * identity.current_user_id_optional() is the anonymous-safe counterpart and
+ * is likewise intentionally PUBLIC. */
+GRANT EXECUTE ON FUNCTION identity.current_user_id() TO PUBLIC;
+GRANT EXECUTE ON FUNCTION identity.current_user_id_optional() TO PUBLIC;
+GRANT EXECUTE ON FUNCTION app.current_request_id() TO PUBLIC;
+GRANT EXECUTE ON FUNCTION app.current_trace_id() TO PUBLIC;
+GRANT EXECUTE ON FUNCTION app.current_actor_class() TO PUBLIC;
+
 
 /* ==========================================================================
  * Application group role
@@ -358,8 +369,7 @@ GRANT USAGE ON SCHEMA marketplace TO brktrkr_import;
 GRANT SELECT, INSERT, UPDATE ON marketplace.market_price_observations TO brktrkr_import;
 
 GRANT USAGE ON SCHEMA app TO brktrkr_api;
-GRANT EXECUTE ON FUNCTION app.set_authenticated_user(uuid) TO brktrkr_api;
-GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,text,text) TO brktrkr_api;
+GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,uuid,text,text) TO brktrkr_api;
 
 
 /* ==========================================================================
@@ -423,6 +433,10 @@ REVOKE USAGE ON SCHEMA
     reporting
 FROM brktrkr_api;
 
+/* brktrkr_api still needs to resolve identity.current_user_id()/
+ * current_user_id_optional() (called directly and via RLS policies). */
+GRANT USAGE ON SCHEMA identity TO brktrkr_api;
+
 REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA
     app,
     identity,
@@ -448,10 +462,11 @@ GRANT USAGE ON SCHEMA api TO brktrkr_api;
  * surface is granted explicitly by 1110_api_surface_lockdown.sql. */
 
 GRANT USAGE ON SCHEMA app TO brktrkr_api;
-GRANT EXECUTE ON FUNCTION app.set_authenticated_user(uuid)
+GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,uuid,text,text)
 TO brktrkr_api;
-
-GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,text,text)
+GRANT EXECUTE ON FUNCTION app.clear_request_context()
+TO brktrkr_api;
+GRANT EXECUTE ON FUNCTION identity.require_current_user_id()
 TO brktrkr_api;
 
 

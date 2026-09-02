@@ -511,7 +511,7 @@ REVOKE ALL ON FUNCTION reporting.rebuild_system_summary() FROM PUBLIC;
 REVOKE ALL ON FUNCTION reporting.get_system_summary() FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION reporting.get_system_summary()
-TO lego_api, lego_app, lego_reporting, lego_importer;
+TO brktrkr_api, brktrkr_reporting, brktrkr_import;
 
 /*
  * Existing database installation requires one initial snapshot. Future

@@ -136,13 +136,13 @@ $$;
 
 /*
  * Context establishment is stored-procedure access, not table access.
- * app.set_authenticated_user() establishes the internal user UUID.
- * app.set_request_context() establishes request/trace correlation.
+ * app.set_request_context() establishes user/request/trace correlation.
  */
-GRANT EXECUTE ON FUNCTION app.set_authenticated_user(uuid)
+GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,uuid,text,text)
 TO brktrkr_admin;
-
-GRANT EXECUTE ON FUNCTION app.set_request_context(uuid,text,text)
+GRANT EXECUTE ON FUNCTION app.clear_request_context()
+TO brktrkr_admin;
+GRANT EXECUTE ON FUNCTION identity.require_current_user_id()
 TO brktrkr_admin;
 
 

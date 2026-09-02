@@ -958,7 +958,6 @@
         "catalog.source_value_history",
         "reference.external_theme_mappings",
         "reference.external_category_mappings",
-        "app.set_import_context(uuid)",
         "reference.external_color_mappings",
         "catalog.part_variants",
         "catalog.lego_elements",
@@ -1003,7 +1002,8 @@
       "depends_on": [
         "0000_bootstrap/0001_schemas.sql",
         "0100_identity/0100_users.sql",
-        "1100_security/1100_roles.sql"
+        "1100_security/1100_roles.sql",
+        "audit.events"
       ]
     },
     {
@@ -1414,173 +1414,127 @@
     },
     {
       "ordinal": 149,
-      "file": "5000_function/5900_tests/5900_test_importer_common.sql",
+      "file": "5000_function/5900_tests/5900_test_app_lifecycle.sql",
       "depends_on": [
-        "5000_function/5000_importer/5000_importer_common.sql"
+        "5000_function/5700_system/5709_system_request_context.sql",
+        "0000_bootstrap/0005_migration_framework.sql"
       ]
     },
     {
       "ordinal": 150,
-      "file": "5000_function/5900_tests/5901_test_rebrickable_reference_reconcile.sql",
-      "depends_on": [
-        "5000_function/5000_importer/5010_importer_rebrickable_reference_reconcile.sql"
-      ]
-    },
-    {
-      "ordinal": 151,
-      "file": "5000_function/5900_tests/5902_test_rebrickable_catalog_reconcile.sql",
-      "depends_on": [
-        "5000_function/5000_importer/5011_importer_rebrickable_catalog_reconcile.sql"
-      ]
-    },
-    {
-      "ordinal": 152,
-      "file": "5000_function/5900_tests/5903_test_fail_source_run.sql",
-      "depends_on": [
-        "5000_function/5000_importer/5012_importer_fail_source_run.sql"
-      ]
-    },
-    {
-      "ordinal": 153,
-      "file": "5000_function/5900_tests/5904_test_set_manifest_enrichment.sql",
-      "depends_on": [
-        "5000_function/5000_importer/5030_importer_set_manifest_enrichment.sql",
-        "5000_function/5400_reporting/5410_reporting_set_manifest_enrichment.sql",
-        "1200_validation/1226_set_manifest_enrichment_validation.sql"
-      ]
-    },
-    {
-      "ordinal": 154,
-      "file": "5000_function/5900_tests/5910_test_admin_common.sql",
-      "depends_on": [
-        "5000_function/5100_admin/5100_admin_common.sql",
-        "1100_security/1112_admin_execute_only.sql"
-      ]
-    },
-    {
-      "ordinal": 155,
-      "file": "5000_function/5900_tests/5911_test_admin_catalog_lifecycle.sql",
-      "depends_on": [
-        "5000_function/5100_admin/5110_admin_catalog_lifecycle.sql",
-        "1100_security/1112_admin_execute_only.sql",
-        "5000_function/5900_tests/5910_test_admin_common.sql"
-      ]
-    },
-    {
-      "ordinal": 156,
-      "file": "5000_function/5900_tests/5912_test_admin_definition_graph.sql",
-      "depends_on": [
-        "5000_function/5100_admin/5120_admin_definition_graph.sql"
-      ]
-    },
-    {
-      "ordinal": 157,
-      "file": "5000_function/5900_tests/5913_test_admin_finance.sql",
-      "depends_on": [
-        "5000_function/5100_admin/5130_admin_finance.sql"
-      ]
-    },
-    {
-      "ordinal": 158,
-      "file": "5000_function/5900_tests/5920_test_api_moc_access.sql",
-      "depends_on": [
-        "5000_function/5200_api/5200_api_moc_access.sql"
-      ]
-    },
-    {
-      "ordinal": 159,
-      "file": "5000_function/5900_tests/5921_test_api_operational.sql",
-      "depends_on": [
-        "5000_function/5200_api/5210_api_operational.sql"
-      ]
-    },
-    {
-      "ordinal": 160,
-      "file": "5000_function/5900_tests/5970_test_system_identity.sql",
+      "file": "5000_function/5900_tests/5901_test_identity_lifecycle.sql",
       "depends_on": [
         "5000_function/5700_system/5700_system_identity.sql"
       ]
     },
     {
-      "ordinal": 161,
-      "file": "5000_function/5900_tests/5971_test_system_hierarchy.sql",
+      "ordinal": 151,
+      "file": "5000_function/5900_tests/5902_test_reference_lifecycle.sql",
       "depends_on": [
         "5000_function/5700_system/5701_system_hierarchy.sql"
       ]
     },
     {
-      "ordinal": 162,
-      "file": "5000_function/5900_tests/5972_test_system_catalog.sql",
+      "ordinal": 152,
+      "file": "5000_function/5900_tests/5903_test_catalog_lifecycle.sql",
       "depends_on": [
-        "5000_function/5700_system/5702_system_catalog.sql"
+        "5000_function/5700_system/5702_system_catalog.sql",
+        "0300_catalog/0320_catalog_search_media.sql"
       ]
     },
     {
-      "ordinal": 163,
-      "file": "5000_function/5900_tests/5973_test_system_definition.sql",
+      "ordinal": 153,
+      "file": "5000_function/5900_tests/5904_test_definition_lifecycle.sql",
       "depends_on": [
-        "5000_function/5700_system/5703_system_definition.sql"
+        "5000_function/5700_system/5703_system_definition.sql",
+        "5000_function/5100_admin/5120_admin_definition_graph.sql",
+        "0400_definitions/0405_manifest_graph.sql"
       ]
     },
     {
-      "ordinal": 164,
-      "file": "5000_function/5900_tests/5974_test_system_collection.sql",
+      "ordinal": 154,
+      "file": "5000_function/5900_tests/5905_test_collection_lifecycle.sql",
       "depends_on": [
-        "5000_function/5700_system/5704_system_collection.sql"
+        "5000_function/5700_system/5704_system_collection.sql",
+        "5000_function/5700_system/5701_system_hierarchy.sql",
+        "5000_function/5700_system/5708_system_integrity_hardening.sql"
       ]
     },
     {
-      "ordinal": 165,
-      "file": "5000_function/5900_tests/5975_test_system_wanted.sql",
+      "ordinal": 155,
+      "file": "5000_function/5900_tests/5906_test_wanted_lifecycle.sql",
       "depends_on": [
-        "5000_function/5700_system/5705_system_wanted.sql"
+        "5000_function/5700_system/5705_system_wanted.sql",
+        "5000_function/5700_system/5708_system_integrity_hardening.sql"
       ]
     },
     {
-      "ordinal": 166,
-      "file": "5000_function/5900_tests/5976_test_system_moc.sql",
+      "ordinal": 156,
+      "file": "5000_function/5900_tests/5907_test_moc_lifecycle.sql",
       "depends_on": [
-        "5000_function/5700_system/5706_system_moc.sql"
+        "5000_function/5700_system/5706_system_moc.sql",
+        "5000_function/5700_system/5701_system_hierarchy.sql",
+        "5000_function/5700_system/5708_system_integrity_hardening.sql"
       ]
     },
     {
-      "ordinal": 167,
-      "file": "5000_function/5900_tests/5977_test_system_audit.sql",
+      "ordinal": 157,
+      "file": "5000_function/5900_tests/5908_test_audit_lifecycle.sql",
       "depends_on": [
         "5000_function/5700_system/5707_system_audit.sql"
       ]
     },
     {
-      "ordinal": 168,
-      "file": "5000_function/5900_tests/5978_test_system_integrity.sql",
+      "ordinal": 158,
+      "file": "5000_function/5900_tests/5909_test_import_lifecycle.sql",
       "depends_on": [
-        "5000_function/5700_system/5708_system_integrity_hardening.sql"
-      ]
-    },
-    {
-      "ordinal": 169,
-      "file": "5000_function/5900_tests/5979_test_system_request_context.sql",
-      "depends_on": [
+        "5000_function/5000_importer/5000_importer_common.sql",
+        "5000_function/5000_importer/5010_importer_rebrickable_reference_reconcile.sql",
+        "5000_function/5000_importer/5011_importer_rebrickable_catalog_reconcile.sql",
+        "5000_function/5000_importer/5012_importer_fail_source_run.sql",
+        "5000_function/5000_importer/5030_importer_set_manifest_enrichment.sql",
+        "5000_function/5400_reporting/5410_reporting_set_manifest_enrichment.sql",
         "5000_function/5700_system/5709_system_request_context.sql"
       ]
     },
     {
-      "ordinal": 170,
-      "file": "5000_function/5900_tests/5980_test_system_summary.sql",
+      "ordinal": 159,
+      "file": "5000_function/5900_tests/5910_test_api_lifecycle.sql",
       "depends_on": [
-        "1000_reporting/1010_reporting_system_summary.sql"
+        "5000_function/5200_api/5200_api_moc_access.sql",
+        "5000_function/5200_api/5210_api_operational.sql"
       ]
     },
     {
-      "ordinal": 171,
-      "file": "5000_function/5900_tests/5981_test_aggregate_tables.sql",
+      "ordinal": 160,
+      "file": "5000_function/5900_tests/5911_test_admin_lifecycle.sql",
       "depends_on": [
+        "5000_function/5100_admin/5100_admin_common.sql",
+        "5000_function/5100_admin/5110_admin_catalog_lifecycle.sql",
+        "5000_function/5100_admin/5130_admin_finance.sql",
+        "5000_function/5200_api/5210_api_operational.sql",
+        "1100_security/1112_admin_execute_only.sql"
+      ]
+    },
+    {
+      "ordinal": 161,
+      "file": "5000_function/5900_tests/5912_test_finance_lifecycle.sql",
+      "depends_on": [
+        "5000_function/5100_admin/5130_admin_finance.sql",
+        "0760_finance/0761_financial_readiness_anchors.sql"
+      ]
+    },
+    {
+      "ordinal": 162,
+      "file": "5000_function/5900_tests/5913_test_reporting_lifecycle.sql",
+      "depends_on": [
+        "1000_reporting/1010_reporting_system_summary.sql",
         "1000_reporting/1011_reporting_aggregate_tables.sql",
-        "5000_function/5900_tests/5980_test_system_summary.sql"
+        "5000_function/5400_reporting/5410_reporting_set_manifest_enrichment.sql"
       ]
     },
     {
-      "ordinal": 172,
+      "ordinal": 163,
       "file": "1200_validation/1213_dependency_validation.sql",
       "depends_on": [
         "1200_validation/1212_integrity_validation.sql",
@@ -1597,29 +1551,20 @@
         "1200_validation/1224_system_summary_validation.sql",
         "1200_validation/1225_aggregate_tables_validation.sql",
         "1200_validation/1226_set_manifest_enrichment_validation.sql",
-        "5000_function/5900_tests/5900_test_importer_common.sql",
-        "5000_function/5900_tests/5901_test_rebrickable_reference_reconcile.sql",
-        "5000_function/5900_tests/5902_test_rebrickable_catalog_reconcile.sql",
-        "5000_function/5900_tests/5903_test_fail_source_run.sql",
-        "5000_function/5900_tests/5904_test_set_manifest_enrichment.sql",
-        "5000_function/5900_tests/5910_test_admin_common.sql",
-        "5000_function/5900_tests/5911_test_admin_catalog_lifecycle.sql",
-        "5000_function/5900_tests/5912_test_admin_definition_graph.sql",
-        "5000_function/5900_tests/5913_test_admin_finance.sql",
-        "5000_function/5900_tests/5920_test_api_moc_access.sql",
-        "5000_function/5900_tests/5921_test_api_operational.sql",
-        "5000_function/5900_tests/5970_test_system_identity.sql",
-        "5000_function/5900_tests/5971_test_system_hierarchy.sql",
-        "5000_function/5900_tests/5972_test_system_catalog.sql",
-        "5000_function/5900_tests/5973_test_system_definition.sql",
-        "5000_function/5900_tests/5974_test_system_collection.sql",
-        "5000_function/5900_tests/5975_test_system_wanted.sql",
-        "5000_function/5900_tests/5976_test_system_moc.sql",
-        "5000_function/5900_tests/5977_test_system_audit.sql",
-        "5000_function/5900_tests/5978_test_system_integrity.sql",
-        "5000_function/5900_tests/5979_test_system_request_context.sql",
-        "5000_function/5900_tests/5980_test_system_summary.sql",
-        "5000_function/5900_tests/5981_test_aggregate_tables.sql"
+        "5000_function/5900_tests/5900_test_app_lifecycle.sql",
+        "5000_function/5900_tests/5901_test_identity_lifecycle.sql",
+        "5000_function/5900_tests/5902_test_reference_lifecycle.sql",
+        "5000_function/5900_tests/5903_test_catalog_lifecycle.sql",
+        "5000_function/5900_tests/5904_test_definition_lifecycle.sql",
+        "5000_function/5900_tests/5905_test_collection_lifecycle.sql",
+        "5000_function/5900_tests/5906_test_wanted_lifecycle.sql",
+        "5000_function/5900_tests/5907_test_moc_lifecycle.sql",
+        "5000_function/5900_tests/5908_test_audit_lifecycle.sql",
+        "5000_function/5900_tests/5909_test_import_lifecycle.sql",
+        "5000_function/5900_tests/5910_test_api_lifecycle.sql",
+        "5000_function/5900_tests/5911_test_admin_lifecycle.sql",
+        "5000_function/5900_tests/5912_test_finance_lifecycle.sql",
+        "5000_function/5900_tests/5913_test_reporting_lifecycle.sql"
       ]
     }
   ]

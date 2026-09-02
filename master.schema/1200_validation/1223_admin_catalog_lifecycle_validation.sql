@@ -66,28 +66,28 @@ SELECT app.assert_true(
 );
 
 
-/* lego_admin must have zero direct table privileges in application schemas. */
+/* brktrkr_admin must have zero direct table privileges in application schemas. */
 SELECT app.assert_true(
     NOT EXISTS (
         SELECT 1
           FROM information_schema.role_table_grants g
-         WHERE g.grantee = 'lego_admin'
+         WHERE g.grantee = 'brktrkr_admin'
            AND g.table_schema IN (
                'identity','reference','catalog','definition','collection',
                'wanted','moc','import','audit','marketplace','finance',
                'operations','reporting'
            )
     ),
-    'lego_admin still has direct application table privileges'
+    'brktrkr_admin still has direct application table privileges'
 );
 
 
-/* lego_admin must not have direct sequence privileges. */
+/* brktrkr_admin must not have direct sequence privileges. */
 SELECT app.assert_true(
     NOT EXISTS (
         SELECT 1
           FROM information_schema.usage_privileges u
-         WHERE u.grantee = 'lego_admin'
+         WHERE u.grantee = 'brktrkr_admin'
            AND u.object_type = 'SEQUENCE'
            AND u.object_schema IN (
                'identity','reference','catalog','definition','collection',
@@ -95,11 +95,11 @@ SELECT app.assert_true(
                'operations','reporting'
            )
     ),
-    'lego_admin still has direct application sequence privileges'
+    'brktrkr_admin still has direct application sequence privileges'
 );
 
 
-/* lego_admin cannot CREATE objects in any application schema. */
+/* brktrkr_admin cannot CREATE objects in any application schema. */
 SELECT app.assert_true(
     NOT EXISTS (
         SELECT 1
@@ -109,58 +109,58 @@ SELECT app.assert_true(
              'wanted','moc','import','audit','api','admin','marketplace',
              'finance','operations','reporting'
          )
-           AND has_schema_privilege('lego_admin', n.oid, 'CREATE')
+           AND has_schema_privilege('brktrkr_admin', n.oid, 'CREATE')
     ),
-    'lego_admin unexpectedly has CREATE on an application schema'
+    'brktrkr_admin unexpectedly has CREATE on an application schema'
 );
 
 
-/* The internal engine/helper are not directly executable by lego_admin. */
+/* The internal engine/helper are not directly executable by brktrkr_admin. */
 SELECT app.assert_true(
     NOT has_function_privilege(
-        'lego_admin',
+        'brktrkr_admin',
         'catalog.transition_item_status(uuid,catalog.item_status,text,text)',
         'EXECUTE'
     ),
-    'lego_admin must not directly execute catalog.transition_item_status(...)'
+    'brktrkr_admin must not directly execute catalog.transition_item_status(...)'
 );
 
 SELECT app.assert_true(
     NOT has_function_privilege(
-        'lego_admin',
+        'brktrkr_admin',
         'admin.assert_system_admin()',
         'EXECUTE'
     ),
-    'lego_admin must not directly execute admin.assert_system_admin()'
+    'brktrkr_admin must not directly execute admin.assert_system_admin()'
 );
 
 
 /* Exact reviewed admin lifecycle surface is executable. */
 SELECT app.assert_true(
     has_function_privilege(
-        'lego_admin',
+        'brktrkr_admin',
         'admin.retire_catalog_item(uuid,text)',
         'EXECUTE'
     ),
-    'lego_admin cannot execute admin.retire_catalog_item(uuid,text)'
+    'brktrkr_admin cannot execute admin.retire_catalog_item(uuid,text)'
 );
 
 SELECT app.assert_true(
     has_function_privilege(
-        'lego_admin',
+        'brktrkr_admin',
         'admin.archive_catalog_item(uuid,text)',
         'EXECUTE'
     ),
-    'lego_admin cannot execute admin.archive_catalog_item(uuid,text)'
+    'brktrkr_admin cannot execute admin.archive_catalog_item(uuid,text)'
 );
 
 SELECT app.assert_true(
     has_function_privilege(
-        'lego_admin',
+        'brktrkr_admin',
         'admin.restore_catalog_item(uuid,text,text)',
         'EXECUTE'
     ),
-    'lego_admin cannot execute admin.restore_catalog_item(uuid,text,text)'
+    'brktrkr_admin cannot execute admin.restore_catalog_item(uuid,text,text)'
 );
 
 
@@ -171,7 +171,7 @@ DECLARE
     v_signature text;
 BEGIN
     FOREACH v_role IN ARRAY ARRAY[
-        'lego_api','lego_app','lego_importer','lego_reporting'
+        'brktrkr_api','brktrkr_import','brktrkr_reporting'
     ]
     LOOP
         FOREACH v_signature IN ARRAY ARRAY[
@@ -247,7 +247,7 @@ SELECT app.assert_true(
 SELECT app.assert_true(
     (
         SELECT p.prosecdef
-           AND r.rolname = 'lego_owner'
+           AND r.rolname = 'brktrkr_owner'
           FROM pg_proc p
           JOIN pg_namespace n ON n.oid = p.pronamespace
           JOIN pg_roles r ON r.oid = p.proowner
@@ -255,7 +255,7 @@ SELECT app.assert_true(
            AND p.proname = 'capture_row_change'
            AND pg_get_function_identity_arguments(p.oid) = ''
     ),
-    'audit.capture_row_change() must remain SECURITY DEFINER owned by lego_owner'
+    'audit.capture_row_change() must remain SECURITY DEFINER owned by brktrkr_owner'
 );
 
 

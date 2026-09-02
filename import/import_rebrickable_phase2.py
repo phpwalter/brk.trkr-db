@@ -47,7 +47,7 @@ def preflight(conn: psycopg.Connection) -> str:
         cur.execute(
             """
             SELECT
-                pg_has_role(%s::text, 'lego_importer'::text, 'MEMBER'::text),
+                pg_has_role(%s::text, 'brktrkr_import'::text, 'MEMBER'::text),
                 to_regprocedure(
                     'import.reconcile_rebrickable_reference(uuid)'
                 ) IS NOT NULL
@@ -58,14 +58,14 @@ def preflight(conn: psycopg.Connection) -> str:
 
         if not is_importer:
             raise RuntimeError(
-                f"PostgreSQL login {login!r} is not a member of lego_importer"
+                f"PostgreSQL login {login!r} is not a member of brktrkr_import"
             )
         if not has_function:
             raise RuntimeError(
                 "import.reconcile_rebrickable_reference(uuid) is not installed"
             )
 
-        cur.execute("SET ROLE lego_importer")
+        cur.execute("SET ROLE brktrkr_import")
 
     conn.commit()
     return login

@@ -1,36 +1,46 @@
+/*
+===============================================================================
+ File:           5000_function/5700_system/5709_system_request_context.sql
+ Project:        BrickTrackr
+ Schema Version: 1.1.0
+ PostgreSQL:     16+
+ Purpose:        Hardened canonical transaction-local request-context
+                 transport. Authentication is performed upstream by trusted
+                 application services; these GUCs carry already-established
+                 authority inside a single PostgreSQL transaction and are
+                 not authentication primitives.
+ Depends On:     0000_bootstrap/0001_schemas.sql
+                 0100_identity/0100_users.sql
+                 1100_security/1100_roles.sql
+                 audit.events
+ Creates:        app.set_request_context()
+                 app.clear_request_context()
+                 app.set_import_context()
+                 identity.current_user_id()
+                 app.current_request_id()
+                 app.current_trace_id()
+                 app.current_actor_class()
+                 identity.require_current_user_id()
+                 audit.events.request_id
+                 audit.events.trace_id
+                 audit.events.actor_class
+ Key Rules:      All app.* context writes use pg_catalog.set_config(..., true).
+                 USER context may be established only by brktrkr_api.
+                 ADMIN context may be established only by brktrkr_admin.
+                 IMPORTER context may be established only by brktrkr_import.
+                 SYSTEM context may be established only by brktrkr_migrator
+                 or brktrkr_owner.
+                 Privileged actor classes never carry an application user UUID.
+                 SECURITY DEFINER routines use search_path = pg_catalog only.
+                 PUBLIC receives no execution right on request-context
+                 mutators. Context clearing is SECURITY INVOKER and
+                 transaction-local. Request-context callers receive USAGE,
+                 not CREATE, on app/identity.
+===============================================================================
+*/
+
 \set ON_ERROR_STOP on
-
--- =============================================================================
--- File: master.schema/5000_function/5700_system/5709_system_request_context.sql
--- File Version: 1.1.0
--- Description:
---   Hardened canonical transaction-local request-context transport for
---   BrickTrackr. Authentication is performed upstream by trusted application
---   services. These GUCs carry already-established authority inside a single
---   PostgreSQL transaction; they are not authentication primitives.
---
--- Security invariants:
---   * All app.* context writes use pg_catalog.set_config(..., true).
---   * USER context may be established only by brktrkr_api.
---   * ADMIN context may be established only by brktrkr_admin.
---   * IMPORTER context may be established only by brktrkr_import.
---   * SYSTEM context may be established only by brktrkr_migrator or
---     brktrkr_owner.
---   * Privileged actor classes never carry an application user UUID.
---   * SECURITY DEFINER routines use search_path = pg_catalog only.
---   * PUBLIC receives no execution right on request-context mutators.
---   * Context clearing is SECURITY INVOKER and transaction-local.
---   * Request-context callers receive USAGE, not CREATE, on app/identity.
--- =============================================================================
-
-SELECT pg_temp.bt_preflight(
-    '5000_function/5700_system/5709_system_request_context.sql',
-    ARRAY[
-        '0000_bootstrap/0001_schemas.sql',
-        '0100_identity/0100_users.sql',
-        '1100_security/1100_roles.sql'
-    ]
-);
+SELECT pg_temp.bt_preflight('5000_function/5700_system/5709_system_request_context.sql', ARRAY['0000_bootstrap/0001_schemas.sql', '0100_identity/0100_users.sql', '1100_security/1100_roles.sql', 'audit.events']::text[]);
 
 -- =============================================================================
 -- 1. Canonical transaction-local context setter
@@ -267,23 +277,67 @@ IS
 'Idempotently clears BrickTrackr transaction-local request context without affecting unrelated PostgreSQL settings.';
 
 -- =============================================================================
--- 3. Observational getters
+-- 2a. Importer provenance context setter
 -- =============================================================================
+-- Distinct from app.set_request_context() because importer batches are
+-- identified by source_run_id, not by an application request/trace pair.
+-- Restored from the pre-hardening implementation with the role check
+-- updated to the current brktrkr_import capability role.
 
-CREATE OR REPLACE FUNCTION identity.current_user_id()
-RETURNS UUID
-LANGUAGE sql
-STABLE
+CREATE OR REPLACE FUNCTION app.set_import_context(
+    p_source_run_id UUID
+)
+RETURNS void
+LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog
 AS $function$
-    SELECT NULLIF(
-        pg_catalog.current_setting('app.current_user_id', TRUE),
-        ''
-    )::UUID;
+BEGIN
+    IF p_source_run_id IS NULL THEN
+        RAISE EXCEPTION
+            'Importer source run id is required'
+            USING ERRCODE = '22004';
+    END IF;
+
+    IF NOT pg_catalog.pg_has_role(
+        SESSION_USER,
+        'brktrkr_import',
+        'MEMBER'
+    ) THEN
+        RAISE EXCEPTION
+            'Importer database role is required'
+            USING ERRCODE = '42501';
+    END IF;
+
+    PERFORM pg_catalog.set_config('app.actor_class', 'IMPORTER', TRUE);
+    PERFORM pg_catalog.set_config('app.source_run_id', p_source_run_id::TEXT, TRUE);
+END;
 $function$;
 
+REVOKE ALL
+ON FUNCTION app.set_import_context(UUID)
+FROM PUBLIC;
+
+ALTER FUNCTION app.set_import_context(UUID)
+OWNER TO brktrkr_owner;
+
+COMMENT ON FUNCTION app.set_import_context(UUID)
+IS
+'Establishes transaction-local IMPORTER actor-class context and source-run provenance for Rebrickable import routines. Restricted to brktrkr_import.';
+
+-- =============================================================================
+-- 3. Observational getters
+-- =============================================================================
+-- identity.current_user_id() and identity.current_user_id_optional() are
+-- canonically defined in 5700_system_identity.sql (which runs before this
+-- file). This file only manages their ownership/grants; it must never
+-- redefine them here, since a CREATE OR REPLACE in this file would silently
+-- clobber 5700's fail-closed implementation with a lenient one.
+
 ALTER FUNCTION identity.current_user_id()
+OWNER TO brktrkr_owner;
+
+ALTER FUNCTION identity.current_user_id_optional()
 OWNER TO brktrkr_owner;
 
 CREATE OR REPLACE FUNCTION app.current_request_id()
@@ -346,15 +400,28 @@ SECURITY INVOKER
 SET search_path = pg_catalog
 AS $function$
 DECLARE
+    v_raw text;
     v_user_id UUID;
 BEGIN
-    v_user_id := identity.current_user_id();
+    -- Reads the GUC directly rather than delegating to the narrowly
+    -- security-reviewed anonymous-safe identity helper (see 1215's
+    -- allowlist for that helper's approved callers).
+    v_raw := NULLIF(pg_catalog.current_setting('app.current_user_id', true), '');
 
-    IF v_user_id IS NULL THEN
+    IF v_raw IS NULL THEN
         RAISE EXCEPTION
             'Required user identity context is absent'
             USING ERRCODE = '22004';
     END IF;
+
+    BEGIN
+        v_user_id := v_raw::UUID;
+    EXCEPTION
+        WHEN invalid_text_representation THEN
+            RAISE EXCEPTION
+                'Required user identity context is invalid'
+                USING ERRCODE = '22004';
+    END;
 
     RETURN v_user_id;
 END;
@@ -438,11 +505,33 @@ TO
     brktrkr_owner;
 
 -- =============================================================================
+-- 5a. Audit request/trace/actor correlation columns
+-- =============================================================================
+-- Restored from the pre-hardening implementation. DEFAULT expressions mean
+-- any INSERT into audit.events that omits these columns automatically picks
+-- up the current transaction-local request context.
+
+ALTER TABLE audit.events
+    ADD COLUMN request_id uuid DEFAULT app.current_request_id(),
+    ADD COLUMN trace_id text DEFAULT app.current_trace_id(),
+    ADD COLUMN actor_class text DEFAULT app.current_actor_class();
+
+ALTER TABLE audit.events
+    ADD CONSTRAINT ck_audit_events_actor_class
+    CHECK (actor_class IS NULL OR actor_class IN ('USER','ADMIN','IMPORTER','SYSTEM'));
+
+CREATE INDEX ix_audit_events_request
+    ON audit.events(request_id)
+    WHERE request_id IS NOT NULL;
+
+CREATE INDEX ix_audit_events_trace
+    ON audit.events(trace_id)
+    WHERE trace_id IS NOT NULL;
+
+-- =============================================================================
 -- 6. Completion marker
 -- =============================================================================
 
-SELECT pg_temp.bt_mark_completed(
-    '5000_function/5700_system/5709_system_request_context.sql'
-);
+SELECT pg_temp.bt_mark_completed('5000_function/5700_system/5709_system_request_context.sql');
 
 \echo '[PASS] 5709_system_request_context.sql v1.1.0 installed successfully.'

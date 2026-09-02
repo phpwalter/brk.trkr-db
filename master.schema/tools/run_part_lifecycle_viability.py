@@ -525,10 +525,10 @@ SELECT (
         "kind": "foundation",
         "sql": """
 SELECT (
-    NOT has_table_privilege('lego_api','catalog.parts','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_app','catalog.parts','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_api','catalog.part_variants','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_app','catalog.part_variants','INSERT,UPDATE,DELETE')
+    NOT has_table_privilege('brktrkr_api','catalog.parts','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','catalog.parts','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','catalog.part_variants','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','catalog.part_variants','INSERT,UPDATE,DELETE')
 )::int;
 """,
         "pass": "Runtime users remain execute-only for canonical part data.",

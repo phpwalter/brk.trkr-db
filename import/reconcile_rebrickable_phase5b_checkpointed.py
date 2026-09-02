@@ -107,12 +107,12 @@ def main():
                 cur.execute("SELECT current_user::text")
                 login = cur.fetchone()[0]
                 cur.execute(
-                    "SELECT pg_has_role(%s,'lego_importer','MEMBER')",
+                    "SELECT pg_has_role(%s,'brktrkr_import','MEMBER')",
                     (login,),
                 )
                 if not cur.fetchone()[0]:
-                    raise RuntimeError(f"{login!r} is not a lego_importer member")
-                cur.execute("SET ROLE lego_importer")
+                    raise RuntimeError(f"{login!r} is not a brktrkr_import member")
+                cur.execute("SET ROLE brktrkr_import")
 
             run_id = a.source_run_id or resolve_run(conn)
 

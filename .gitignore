@@ -5,8 +5,8 @@
 /_archive/*
 /import/rebrickable-downloads/*
 /.tmp_role_model_update/
-!/.tmp_role_model_update/
+/.tmp_transaction_context_live/
 /backups/
-!/backups/
 /logs/
-!/logs/
+__pycache__/
+*.pyc

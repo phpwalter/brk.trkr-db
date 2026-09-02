@@ -95,11 +95,10 @@ SELECT app.assert_no_rows(
 $$
     SELECT 1
     FROM (VALUES
-        ('lego_api'),
-        ('lego_app'),
-        ('lego_admin'),
-        ('lego_importer'),
-        ('lego_reporting')
+        ('brktrkr_api'),
+        ('brktrkr_admin'),
+        ('brktrkr_import'),
+        ('brktrkr_reporting')
     ) r(role_name)
     CROSS JOIN (VALUES
         ('reporting.system_summary'),
@@ -125,16 +124,16 @@ SELECT app.assert_true(
 
 SELECT app.assert_true(
     has_function_privilege(
-        'lego_importer',
+        'brktrkr_import',
         'import.get_system_summary()',
         'EXECUTE'
     ),
-    'lego_importer cannot execute import.get_system_summary()'
+    'brktrkr_import cannot execute import.get_system_summary()'
 );
 
 SELECT app.assert_true(
-    NOT has_schema_privilege('lego_importer', 'reporting', 'USAGE'),
-    'lego_importer should not require direct USAGE on reporting schema'
+    NOT has_schema_privilege('brktrkr_import', 'reporting', 'USAGE'),
+    'brktrkr_import should not require direct USAGE on reporting schema'
 );
 
 SELECT app.assert_true(

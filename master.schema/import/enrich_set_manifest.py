@@ -241,10 +241,10 @@ def main() -> int:
         with conn.cursor() as cur:
             cur.execute("SELECT current_user::text")
             login = cur.fetchone()[0]
-            cur.execute("SELECT pg_has_role(%s,'lego_importer','MEMBER')", (login,))
+            cur.execute("SELECT pg_has_role(%s,'brktrkr_import','MEMBER')", (login,))
             if not cur.fetchone()[0]:
-                raise RuntimeError(f"{login!r} is not a lego_importer member")
-            cur.execute("SET ROLE lego_importer")
+                raise RuntimeError(f"{login!r} is not a brktrkr_import member")
+            cur.execute("SET ROLE brktrkr_import")
         conn.commit()
 
         canonical_set_num = db_set_num(conn, a.set_num.strip())

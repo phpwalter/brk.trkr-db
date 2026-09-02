@@ -75,7 +75,7 @@ CREATE INDEX IF NOT EXISTS ix_set_manifest_components_set
 
 REVOKE ALL ON TABLE definition.set_manifest_components FROM PUBLIC;
 REVOKE ALL ON TABLE definition.set_manifest_components
-    FROM lego_api, lego_app, lego_admin, lego_importer, lego_reporting;
+    FROM brktrkr_api, brktrkr_admin, brktrkr_import, brktrkr_reporting;
 
 COMMENT ON TABLE definition.set_manifest_components IS
     'Source-backed SET manifest evidence for STICKER_SHEET, INSTRUCTIONS, and PACKAGING. Canonical mutation is through importer routines only.';

@@ -550,12 +550,12 @@ SELECT (
         "kind": "foundation",
         "sql": """
 SELECT (
-    NOT has_table_privilege('lego_api','wanted.wishlists','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_app','wanted.wishlists','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_api','wanted.wishlist_entries','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_app','wanted.wishlist_entries','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_api','wanted.wishlist_reservations','INSERT,UPDATE,DELETE')
-    AND NOT has_table_privilege('lego_app','wanted.wishlist_reservations','INSERT,UPDATE,DELETE')
+    NOT has_table_privilege('brktrkr_api','wanted.wishlists','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','wanted.wishlists','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','wanted.wishlist_entries','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','wanted.wishlist_entries','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','wanted.wishlist_reservations','INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('brktrkr_api','wanted.wishlist_reservations','INSERT,UPDATE,DELETE')
 )::int;
 """,
         "pass": "Runtime wishlist access remains stored-procedure/API only.",

@@ -8,8 +8,8 @@ real-PgBouncer verification.
 
 - `master.schema/5000_function/5700_system/5709_system_request_context.sql`
   - canonical transaction-local setter, clearer, getters, ownership and ACLs.
-- `master.schema/5000_function/5900_tests/5979_test_system_request_context.sql`
-  - bootstrap-safe unit regression checks.
+- `master.schema/5000_function/5900_tests/5900_test_app_lifecycle.sql`
+  - bootstrap-safe unit regression checks (app schema, includes request context).
 - `master.schema/1200_validation/1217_pgbouncer_transaction_context_validation.sql`
   - installed-catalog security/ACL/default-setting validation.
 - `master.schema/tools/verify_transaction_context.py`

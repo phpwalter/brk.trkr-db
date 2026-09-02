@@ -16,8 +16,8 @@
  Creates:        import.upsert_set_manifest_component(...)
                  import.mark_set_manifest_component_missing(...)
                  import.reconcile_rebrickable_sticker_sheets(uuid)
- Key Rules:      SECURITY DEFINER; lego_importer membership required.
-                 lego_importer has no direct DML on definition tables.
+ Key Rules:      SECURITY DEFINER; brktrkr_import membership required.
+                 brktrkr_import has no direct DML on definition tables.
 ===============================================================================
 */
 \set ON_ERROR_STOP on
@@ -43,9 +43,9 @@ DECLARE
     v_kind catalog.item_kind;
     v_row definition.set_manifest_components%ROWTYPE;
 BEGIN
-    IF NOT pg_has_role(session_user, 'lego_importer', 'MEMBER') THEN
+    IF NOT pg_has_role(session_user, 'brktrkr_import', 'MEMBER') THEN
         RAISE EXCEPTION
-            'import.upsert_set_manifest_component requires lego_importer membership'
+            'import.upsert_set_manifest_component requires brktrkr_import membership'
             USING ERRCODE = '42501';
     END IF;
 
@@ -174,9 +174,9 @@ DECLARE
     v_kind catalog.item_kind;
     v_count integer;
 BEGIN
-    IF NOT pg_has_role(session_user, 'lego_importer', 'MEMBER') THEN
+    IF NOT pg_has_role(session_user, 'brktrkr_import', 'MEMBER') THEN
         RAISE EXCEPTION
-            'import.mark_set_manifest_component_missing requires lego_importer membership'
+            'import.mark_set_manifest_component_missing requires brktrkr_import membership'
             USING ERRCODE = '42501';
     END IF;
 
@@ -230,11 +230,11 @@ REVOKE ALL ON FUNCTION import.mark_set_manifest_component_missing(
 
 GRANT EXECUTE ON FUNCTION import.upsert_set_manifest_component(
     text,text,text,text,text,text,integer,jsonb
-) TO lego_importer;
+) TO brktrkr_import;
 
 GRANT EXECUTE ON FUNCTION import.mark_set_manifest_component_missing(
     text,text,text,text
-) TO lego_importer;
+) TO brktrkr_import;
 
 
 /* -------------------------------------------------------------------------- */
@@ -259,9 +259,9 @@ DECLARE
     v_sticker_types bigint := 0;
     v_manifest_rows bigint := 0;
 BEGIN
-    IF NOT pg_has_role(session_user, 'lego_importer', 'MEMBER') THEN
+    IF NOT pg_has_role(session_user, 'brktrkr_import', 'MEMBER') THEN
         RAISE EXCEPTION
-            'import.reconcile_rebrickable_sticker_sheets requires lego_importer membership'
+            'import.reconcile_rebrickable_sticker_sheets requires brktrkr_import membership'
             USING ERRCODE = '42501';
     END IF;
 
@@ -567,7 +567,7 @@ FROM PUBLIC;
 
 GRANT EXECUTE
 ON FUNCTION import.reconcile_rebrickable_sticker_sheets(uuid)
-TO lego_importer;
+TO brktrkr_import;
 
 
 SELECT pg_temp.bt_mark_completed('5000_function/5000_importer/5030_importer_set_manifest_enrichment.sql');

@@ -210,7 +210,7 @@ def preflight(conn: psycopg.Connection) -> tuple[str, int]:
         cur.execute(
             """
             SELECT
-                pg_has_role(%s::text, 'lego_importer'::text, 'MEMBER'::text),
+                pg_has_role(%s::text, 'brktrkr_import'::text, 'MEMBER'::text),
                 to_regclass('import.source_runs') IS NOT NULL,
                 to_regclass('import.source_run_datasets') IS NOT NULL,
                 to_regclass('import.source_stage_records') IS NOT NULL,
@@ -228,7 +228,7 @@ def preflight(conn: psycopg.Connection) -> tuple[str, int]:
         failures: list[str] = []
         if not is_importer:
             failures.append(
-                f"login {login!r} is not a member of lego_importer"
+                f"login {login!r} is not a member of brktrkr_import"
             )
         if not has_runs:
             failures.append("import.source_runs is missing")
@@ -242,7 +242,7 @@ def preflight(conn: psycopg.Connection) -> tuple[str, int]:
         if failures:
             raise RuntimeError("; ".join(failures))
 
-        cur.execute("SET ROLE lego_importer")
+        cur.execute("SET ROLE brktrkr_import")
 
     conn.commit()
     return login, int(source_id)
@@ -549,7 +549,7 @@ def run() -> int:
             try:
                 with psycopg.connect(args.dsn, options='-c client_encoding=UTF8') as conn:
                     with conn.cursor() as cur:
-                        cur.execute("SET ROLE lego_importer")
+                        cur.execute("SET ROLE brktrkr_import")
                     conn.commit()
                     fail_run(conn, source_run_id, str(exc))
             except Exception:

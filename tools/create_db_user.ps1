@@ -10,7 +10,7 @@
     - The supplied target password is never printed.
 
 .USAGE
-    .\create_db_user.ps1 -Username "lego_api" -Password "StrongPasswordHere"
+    .\create_db_user.ps1 -Username "brktrkr_api" -Password "StrongPasswordHere"
 #>
 
 [CmdletBinding()]

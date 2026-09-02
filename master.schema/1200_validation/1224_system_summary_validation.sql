@@ -61,7 +61,7 @@ $$,
 SELECT app.assert_no_rows(
 $$
     SELECT 1
-    FROM (VALUES ('lego_api'),('lego_app'),('lego_importer')) r(role_name)
+    FROM (VALUES ('brktrkr_api'),('brktrkr_import')) r(role_name)
     WHERE to_regrole(r.role_name) IS NOT NULL
       AND has_table_privilege(r.role_name, 'reporting.system_summary', 'INSERT,UPDATE,DELETE')
 $$,

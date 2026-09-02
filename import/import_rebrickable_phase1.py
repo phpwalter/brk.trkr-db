@@ -31,8 +31,8 @@ Security
 --------
 - No embedded/default database password.
 - Requires BRICKTRACKR_IMPORT_DATABASE_URL or --dsn.
-- Requires the connecting login to be a member of lego_importer.
-- Executes database work as SET ROLE lego_importer.
+- Requires the connecting login to be a member of brktrkr_import.
+- Executes database work as SET ROLE brktrkr_import.
 - Writes only to import.source_runs, import.source_run_datasets, and
   import.source_stage_records in Phase 1.
 - Never writes directly to canonical reference/catalog tables.
@@ -363,11 +363,11 @@ def preflight_database(conn: Connection) -> None:
                 EXISTS (
                     SELECT 1
                     FROM pg_catalog.pg_roles
-                    WHERE rolname = 'lego_importer'
+                    WHERE rolname = 'brktrkr_import'
                 ),
                 pg_catalog.pg_has_role(
                     %s::text,
-                    'lego_importer'::text,
+                    'brktrkr_import'::text,
                     'MEMBER'::text
                 ),
                 EXISTS (
@@ -401,10 +401,10 @@ def preflight_database(conn: Connection) -> None:
         if not has_stage:
             failures.append("import.source_stage_records is missing")
         if not has_importer_role:
-            failures.append("lego_importer role is missing")
+            failures.append("brktrkr_import role is missing")
         if has_importer_role and not is_importer_member:
             failures.append(
-                f"connecting login {current_login!r} is not a member of lego_importer"
+                f"connecting login {current_login!r} is not a member of brktrkr_import"
             )
         if not has_source:
             failures.append(
@@ -416,7 +416,7 @@ def preflight_database(conn: Connection) -> None:
                 "database import preflight failed: " + "; ".join(failures)
             )
 
-        cur.execute("SET ROLE lego_importer")
+        cur.execute("SET ROLE brktrkr_import")
 
     conn.commit()
 

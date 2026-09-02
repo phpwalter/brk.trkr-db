@@ -178,7 +178,7 @@ def main() -> int:
                     SELECT
                         pg_has_role(
                             %s::text,
-                            'lego_importer'::text,
+                            'brktrkr_import'::text,
                             'MEMBER'::text
                         ),
                         has_function_privilege(
@@ -198,14 +198,14 @@ def main() -> int:
 
                 if not member:
                     raise RuntimeError(
-                        f"login {login!r} is not a member of lego_importer"
+                        f"login {login!r} is not a member of brktrkr_import"
                     )
                 if not can_init or not can_run:
                     raise RuntimeError(
                         "checkpointed Phase 3B database functions are not installed/granted"
                     )
 
-                cur.execute("SET ROLE lego_importer")
+                cur.execute("SET ROLE brktrkr_import")
             with conn.transaction():
                 with conn.cursor() as cur:
                     cur.execute(

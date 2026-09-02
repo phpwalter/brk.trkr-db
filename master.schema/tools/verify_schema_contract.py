@@ -36,6 +36,14 @@ APP_SCHEMAS = (
     "operations", "reporting", "marketplace",
 )
 
+LIFECYCLE_VIABILITY_SCRIPTS = (
+    "run_minifig_lifecycle_viability.py",
+    "run_moc_lifecycle_viability.py",
+    "run_part_lifecycle_viability.py",
+    "run_set_lifecycle_viability.py",
+    "run_wishlist_lifecycle_viability.py",
+)
+
 def redact_dsn(dsn: str | None) -> str:
     if not dsn:
         return "<not supplied>"
@@ -138,6 +146,16 @@ def run_query_plans(psql: str, dsn: str) -> None:
     if cp.returncode != 0:
         raise RuntimeError("query-plan contract failed")
 
+def run_lifecycle_viability(dsn: str) -> None:
+    print("\n=== LIFECYCLE VIABILITY CONTRACT ===", flush=True)
+    for name in LIFECYCLE_VIABILITY_SCRIPTS:
+        print(f"\n[LIFECYCLE] {name}", flush=True)
+        cp = run([sys.executable, str(TOOLS / name), "--database", dsn])
+        if cp.returncode == 2:
+            raise RuntimeError(f"lifecycle viability suite blocked: {name}")
+        if cp.returncode not in (0, 1):
+            raise RuntimeError(f"lifecycle viability suite errored: {name}")
+
 def run_pgbouncer(psql: str, dsn: str, user_id: str) -> None:
     print("\n=== PGBOUNCER TRANSACTION-CONTEXT CONTRACT ===", flush=True)
     cp = run([
@@ -169,6 +187,11 @@ def parse_args() -> argparse.Namespace:
         "--query-plans",
         action="store_true",
         help="Run production-equivalent EXPLAIN/index-plan checks on --database.",
+    )
+    p.add_argument(
+        "--lifecycle-viability",
+        action="store_true",
+        help="Run the minifig/moc/part/set/wishlist lifecycle viability suites on --database.",
     )
     p.add_argument(
         "--pgbouncer-database",
@@ -212,6 +235,7 @@ def main() -> int:
         "static": "not-run",
         "bootstrap": "not-run",
         "query_plans": "not-run",
+        "lifecycle_viability": "not-run",
         "pgbouncer": "not-run",
         "status": "failed",
     }
@@ -232,6 +256,8 @@ def main() -> int:
             )
         if args.query_plans and not args.database:
             raise RuntimeError("--query-plans requires --database")
+        if args.lifecycle_viability and not args.database:
+            raise RuntimeError("--lifecycle-viability requires --database")
         if args.require_pgbouncer and not args.pgbouncer_database:
             raise RuntimeError(
                 "--require-pgbouncer was specified but no PgBouncer DSN was supplied"
@@ -253,6 +279,9 @@ def main() -> int:
             if args.query_plans:
                 run_query_plans(psql, args.database)
                 result["query_plans"] = "passed"
+            if args.lifecycle_viability:
+                run_lifecycle_viability(args.database)
+                result["lifecycle_viability"] = "passed"
 
         if args.pgbouncer_database:
             run_pgbouncer(psql, args.pgbouncer_database, args.pgbouncer_user_id)

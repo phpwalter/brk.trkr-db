@@ -14,8 +14,8 @@
                  reference.themes
                  reference.categories
  Creates:        import.reconcile_rebrickable_reference(uuid)
- Security:       SECURITY DEFINER; callable only by lego_importer after grants.
-                 lego_importer receives no direct canonical DML.
+ Security:       SECURITY DEFINER; callable only by brktrkr_import after grants.
+                 brktrkr_import receives no direct canonical DML.
 ===============================================================================
 */
 

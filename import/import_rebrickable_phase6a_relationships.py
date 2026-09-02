@@ -162,7 +162,7 @@ def preflight_database(conn: psycopg.Connection) -> None:
                 to_regclass('import.source_runs') IS NOT NULL,
                 to_regclass('import.source_run_datasets') IS NOT NULL,
                 to_regclass('import.source_stage_records') IS NOT NULL,
-                pg_has_role(%s::text, 'lego_importer'::text, 'MEMBER'::text),
+                pg_has_role(%s::text, 'brktrkr_import'::text, 'MEMBER'::text),
                 EXISTS (
                     SELECT 1
                     FROM reference.external_sources
@@ -181,14 +181,14 @@ def preflight_database(conn: psycopg.Connection) -> None:
         if not has_stage:
             failures.append("import.source_stage_records missing")
         if not is_importer:
-            failures.append(f"{login!r} is not a member of lego_importer")
+            failures.append(f"{login!r} is not a member of brktrkr_import")
         if not has_source:
             failures.append("REBRICKABLE source missing")
 
         if failures:
             raise RuntimeError("; ".join(failures))
 
-        cur.execute("SET ROLE lego_importer")
+        cur.execute("SET ROLE brktrkr_import")
 
     conn.commit()
 

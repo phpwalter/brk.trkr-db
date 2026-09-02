@@ -68,6 +68,6 @@ $function$;
 
 REVOKE ALL ON FUNCTION reporting.get_set_manifest_enrichment(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION reporting.get_set_manifest_enrichment(text)
-TO lego_reporting;
+TO brktrkr_reporting;
 
 SELECT pg_temp.bt_mark_completed('5000_function/5400_reporting/5410_reporting_set_manifest_enrichment.sql');

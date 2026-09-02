@@ -41,13 +41,13 @@ def main():
             login = cur.fetchone()[0]
 
             cur.execute(
-                "SELECT pg_has_role(%s::text, 'lego_importer'::text, 'MEMBER'::text)",
+                "SELECT pg_has_role(%s::text, 'brktrkr_import'::text, 'MEMBER'::text)",
                 (login,),
             )
             if not cur.fetchone()[0]:
-                raise RuntimeError(f"{login!r} is not a member of lego_importer")
+                raise RuntimeError(f"{login!r} is not a member of brktrkr_import")
 
-            cur.execute("SET ROLE lego_importer")
+            cur.execute("SET ROLE brktrkr_import")
 
             cur.execute(
                 """

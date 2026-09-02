@@ -100,7 +100,7 @@ BEGIN
      *
      * IMPORTER
      *   Represents source-driven canonical reconciliation, not a human actor.
-     *   Only a PostgreSQL login that is actually a member of lego_importer may
+     *   Only a PostgreSQL login that is actually a member of brktrkr_import may
      *   use this class, and source_run_id is mandatory provenance.
      *
      * SYSTEM
@@ -116,11 +116,11 @@ BEGIN
     IF v_actor_class = 'IMPORTER' THEN
         IF NOT pg_catalog.pg_has_role(
             session_user,
-            'lego_importer',
+            'brktrkr_import',
             'MEMBER'
         ) THEN
             RAISE EXCEPTION
-                'IMPORTER audit context requires lego_importer membership'
+                'IMPORTER audit context requires brktrkr_import membership'
                 USING ERRCODE = '42501';
         END IF;
 

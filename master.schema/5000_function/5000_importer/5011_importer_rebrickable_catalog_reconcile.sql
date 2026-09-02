@@ -13,7 +13,6 @@
                  catalog.source_value_history
                  reference.external_theme_mappings
                  reference.external_category_mappings
-                 app.set_import_context(uuid)
                  reference.external_color_mappings
                  catalog.part_variants
                  catalog.lego_elements
@@ -38,7 +37,16 @@
 
 ===============================================================================
 */
-SELECT pg_temp.bt_preflight('5000_function/5000_importer/5011_importer_rebrickable_catalog_reconcile.sql', ARRAY['5000_function/5000_importer/5000_importer_common.sql', 'catalog.items', 'catalog.parts', 'catalog.sets', 'catalog.minifigures', 'catalog.external_identifiers', 'catalog.source_values', 'catalog.source_value_history', 'reference.external_theme_mappings', 'reference.external_category_mappings', 'app.set_import_context(uuid)', 'reference.external_color_mappings', 'catalog.part_variants', 'catalog.lego_elements', '0300_catalog/0320_catalog_search_media.sql', '0800_imports/0802_raw_staging.sql']::text[]);
+SELECT pg_temp.bt_preflight('5000_function/5000_importer/5011_importer_rebrickable_catalog_reconcile.sql', ARRAY['5000_function/5000_importer/5000_importer_common.sql', 'catalog.items', 'catalog.parts', 'catalog.sets', 'catalog.minifigures', 'catalog.external_identifiers', 'catalog.source_values', 'catalog.source_value_history', 'reference.external_theme_mappings', 'reference.external_category_mappings', 'reference.external_color_mappings', 'catalog.part_variants', 'catalog.lego_elements', '0300_catalog/0320_catalog_search_media.sql', '0800_imports/0802_raw_staging.sql']::text[]);
+
+-- NOTE: app.set_import_context(uuid) (called by all four phaseNb_run_checkpoint/
+-- initialize routines below) is intentionally NOT a preflight dependency here.
+-- PL/pgSQL late-binds function calls inside a body, so it only needs to exist
+-- by the time these routines are CALLED, not by the time they are CREATEd.
+-- It is created later in bootstrap order (5709_system_request_context.sql),
+-- after 1100_roles.sql, which its own GRANT statements require -- declaring
+-- it as a preflight dependency here would create an unsatisfiable ordering
+-- cycle against this file's earlier bootstrap position.
 
 CREATE OR REPLACE FUNCTION import.phase3b_initialize(p_source_run_id uuid, p_restart boolean DEFAULT false)
  RETURNS jsonb
