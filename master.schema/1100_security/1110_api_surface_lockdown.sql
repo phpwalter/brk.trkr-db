@@ -2,7 +2,7 @@
 ===============================================================================
  File:           1100_security/1110_api_surface_lockdown.sql
  Project:        BrickTrackr
- Schema Version: 1.3.1
+ Schema Version: 1.3.2
  PostgreSQL:     16+
  Purpose:        Make the runtime stored-procedure/API surface explicit,
                  deny-by-default, mechanically reviewable, and safe to rerun.
@@ -24,6 +24,7 @@
                  5000_function/5200_api/5221_api_catalog_reference.sql
                  5000_function/5200_api/5222_api_definition_helpers.sql
                  5000_function/5200_api/5230_api_collection_inventory.sql
+                 5000_function/5200_api/5231_api_inventory_import.sql
                  5000_function/5200_api/5240_api_wanted.sql
                  5000_function/5200_api/5250_api_moc_minifig.sql
                  5000_function/5200_api/5260_api_identity_activity.sql
@@ -44,7 +45,9 @@
                  and are granted only to brktrkr_admin by 1114.
                  Authenticated mutation dispatchers are never classified as
                  anonymous-safe. Anonymous authored-resource reads use the
-                 dedicated visibility dispatcher.
+                 dedicated visibility dispatcher. Normalized inventory imports
+                 use a focused authenticated routine that fails closed on
+                 ambiguous part-variant resolution.
                  New api.* routines receive no PUBLIC/runtime EXECUTE by default.
                  The allowlist is reconciled idempotently on every run.
 ===============================================================================
@@ -72,6 +75,7 @@ SELECT pg_temp.bt_preflight(
         '5000_function/5200_api/5221_api_catalog_reference.sql',
         '5000_function/5200_api/5222_api_definition_helpers.sql',
         '5000_function/5200_api/5230_api_collection_inventory.sql',
+        '5000_function/5200_api/5231_api_inventory_import.sql',
         '5000_function/5200_api/5240_api_wanted.sql',
         '5000_function/5200_api/5250_api_moc_minifig.sql',
         '5000_function/5200_api/5260_api_identity_activity.sql',
@@ -121,6 +125,7 @@ WITH authoritative_allowlist(routine_signature,purpose,anonymous_safe) AS (
         ('api.get_part_inventory_links(text)', 'Authenticated part-to-owned-inventory links.', false),
         ('api.mark_notification_read(uuid)', 'Mark an authenticated caller-owned notification as read.', false),
         ('api.transfer_collection_quantity(uuid,uuid,app.quantity,text)', 'Transfer collection quantity after authorization checks.', false),
+        ('api.import_inventory_normalized(jsonb)', 'Authenticated atomic normalized inventory import with exact part-variant resolution.', false),
         ('api.catalog_reference_operation(text,jsonb)', 'Public/reference catalog dispatcher with operation-level read controls.', true),
         ('api.collection_inventory_operation(text,jsonb,jsonb,text)', 'Authenticated collection, physical inventory and storage lifecycle dispatcher.', false),
         ('api.wanted_operation(text,jsonb,jsonb,text)', 'Authenticated wishlist and build-goal lifecycle dispatcher.', false),
@@ -157,6 +162,7 @@ WITH authoritative(routine_signature) AS (
         ('api.get_part_inventory_links(text)'),
         ('api.mark_notification_read(uuid)'),
         ('api.transfer_collection_quantity(uuid,uuid,app.quantity,text)'),
+        ('api.import_inventory_normalized(jsonb)'),
         ('api.catalog_reference_operation(text,jsonb)'),
         ('api.collection_inventory_operation(text,jsonb,jsonb,text)'),
         ('api.wanted_operation(text,jsonb,jsonb,text)'),
@@ -199,8 +205,8 @@ DECLARE
     v_count integer;
 BEGIN
     SELECT count(*) INTO v_count FROM app.runtime_api_allowlist;
-    IF v_count<>28 THEN
-        RAISE EXCEPTION 'Runtime API allowlist cardinality mismatch: expected 28, found %.',v_count;
+    IF v_count<>29 THEN
+        RAISE EXCEPTION 'Runtime API allowlist cardinality mismatch: expected 29, found %.',v_count;
     END IF;
 
     FOR v_signature IN SELECT routine_signature FROM app.runtime_api_allowlist ORDER BY routine_signature LOOP
@@ -220,5 +226,5 @@ BEGIN
 END
 $verify_api_surface$;
 
-\echo '[PASS] 1110_api_surface_lockdown.sql v1.3.1'
+\echo '[PASS] 1110_api_surface_lockdown.sql v1.3.2'
 SELECT pg_temp.bt_mark_completed('1100_security/1110_api_surface_lockdown.sql');
