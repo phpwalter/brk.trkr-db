@@ -2,7 +2,7 @@
 ===============================================================================
  File:           0000_bootstrap/0006_dependency_preflight_v3.sql
  Project:        BrickTrackr
- Schema Version: 1.3.1
+ Schema Version: 1.3.2
  PostgreSQL:     16+
  Purpose:        Extend the generated dependency gate with additive v3 files
                  without rewriting the stable base dependency manifest.
@@ -28,6 +28,7 @@ VALUES
     (1008,'5000_function/5200_api/5221_api_catalog_reference.sql',ARRAY['reference.colors','reference.themes','reference.categories','reference.minifig_roles','catalog.items','catalog.item_images','catalog.external_identifiers','catalog.part_variants','catalog.lego_elements','catalog.part_molds','catalog.part_mold_revisions','catalog.part_mold_substitutions','definition.inventory_definitions','definition.inventory_versions','definition.requirement_groups','definition.requirement_options','definition.minifig_compositions','definition.minifig_structural_components','definition.minifig_accessories']::text[]),
     (1009,'5000_function/5200_api/5222_api_definition_helpers.sql',ARRAY['definition.inventory_versions','definition.requirement_groups','definition.requirement_options','catalog.items','catalog.part_variants','pgcrypto']::text[]),
     (1010,'5000_function/5200_api/5230_api_collection_inventory.sql',ARRAY['api.current_user_owner_id()','api.assert_if_match()','identity.current_user_id()','identity.can_view_owner()','identity.can_manage_owner()','collection.collections','collection.collection_memberships','collection.entries','collection.instances','collection.instance_adjustments','collection.storage_locations','collection.storage_allocations','collection.acquisitions','collection.acquisition_items','catalog.items','catalog.part_variants','definition.inventory_versions','definition.requirement_groups','definition.requirement_options']::text[]),
+    (1024,'5000_function/5200_api/5231_api_inventory_import.sql',ARRAY['5000_function/5200_api/5230_api_collection_inventory.sql','identity.current_user_id()','catalog.items','catalog.parts','catalog.part_variants']::text[]),
     (1011,'5000_function/5200_api/5240_api_wanted.sql',ARRAY['api.current_user_owner_id()','api.assert_if_match()','identity.current_user_id()','identity.can_view_owner()','identity.can_manage_owner()','identity.can_view_family_shared_owner()','wanted.wishlists','wanted.wishlist_entries','wanted.wishlist_reservations','wanted.build_goals','wanted.build_allocations','collection.entries','catalog.items','catalog.part_variants','definition.inventory_versions','definition.requirement_groups','definition.requirement_options']::text[]),
     (1012,'5000_function/5200_api/5250_api_moc_minifig.sql',ARRAY['api.current_user_owner_id()','api.assert_if_match()','api.inventory_graph_json()','api.replace_inventory_graph()','api.copy_inventory_graph()','api.finalize_inventory_version()','identity.current_user_id()','identity.can_view_owner()','identity.can_manage_owner()','identity.can_view_family_shared_owner()','catalog.items','catalog.mocs','catalog.minifigures','definition.custom_minifigs','definition.inventory_definitions','definition.inventory_versions','definition.minifig_compositions','definition.minifig_structural_components','definition.minifig_accessories','moc.mocs','moc.revisions','moc.forks','moc.subassemblies','moc.licenses','moc.assets','marketplace.market_price_observations']::text[]),
     (1013,'5000_function/5200_api/5260_api_identity_activity.sql',ARRAY['api.assert_if_match()','identity.current_user_id()','identity.users','identity.families','identity.family_memberships','identity.family_member_permissions','identity.owners','operations.notifications','audit.events','collection.entries','marketplace.market_price_observations']::text[]),
@@ -45,7 +46,6 @@ ON CONFLICT (file_path) DO UPDATE
 SET ordinal=EXCLUDED.ordinal,
     dependencies=EXCLUDED.dependencies;
 
-/* Existing file whose reviewed dependency contract expanded in v3. */
 UPDATE pg_temp.bt_expected_files
 SET dependencies=ARRAY[
     '1100_security/1107_grants.sql',
@@ -66,6 +66,7 @@ SET dependencies=ARRAY[
     '5000_function/5200_api/5221_api_catalog_reference.sql',
     '5000_function/5200_api/5222_api_definition_helpers.sql',
     '5000_function/5200_api/5230_api_collection_inventory.sql',
+    '5000_function/5200_api/5231_api_inventory_import.sql',
     '5000_function/5200_api/5240_api_wanted.sql',
     '5000_function/5200_api/5250_api_moc_minifig.sql',
     '5000_function/5200_api/5260_api_identity_activity.sql',
@@ -87,5 +88,5 @@ SELECT pg_temp.bt_preflight(
     ARRAY['0000_bootstrap/0000_dependency_preflight.sql']::text[]
 );
 
-\echo '[PASS] 0006_dependency_preflight_v3.sql v1.3.1'
+\echo '[PASS] 0006_dependency_preflight_v3.sql v1.3.2'
 SELECT pg_temp.bt_mark_completed('0000_bootstrap/0006_dependency_preflight_v3.sql');
