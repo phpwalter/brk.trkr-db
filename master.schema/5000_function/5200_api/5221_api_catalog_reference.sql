@@ -8,7 +8,7 @@
                  the original operational API routines.
  Depends On:     reference.colors
                  reference.themes
-                 reference.part_categories
+                 reference.categories
                  reference.minifig_roles
                  catalog.items
                  catalog.item_images
@@ -39,7 +39,7 @@ SELECT pg_temp.bt_preflight(
     ARRAY[
         'reference.colors',
         'reference.themes',
-        'reference.part_categories',
+        'reference.categories',
         'reference.minifig_roles',
         'catalog.items',
         'catalog.item_images',
@@ -88,9 +88,9 @@ BEGIN
           FROM (SELECT * FROM reference.themes ORDER BY theme_id LIMIT v_limit) x;
 
     WHEN 'list_categories' THEN
-        SELECT COALESCE(jsonb_agg(to_jsonb(x)), '[]'::jsonb)
+        SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.category_id), '[]'::jsonb)
           INTO v_result
-          FROM (SELECT * FROM reference.part_categories LIMIT v_limit) x;
+          FROM (SELECT * FROM reference.categories ORDER BY category_id LIMIT v_limit) x;
 
     WHEN 'list_minifig_roles' THEN
         SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.minifig_role_id), '[]'::jsonb)
