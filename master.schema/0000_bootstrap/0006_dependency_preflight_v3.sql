@@ -2,7 +2,7 @@
 ===============================================================================
  File:           0000_bootstrap/0006_dependency_preflight_v3.sql
  Project:        BrickTrackr
- Schema Version: 1.3.2
+ Schema Version: 1.3.3
  PostgreSQL:     16+
  Purpose:        Extend the generated dependency gate with additive v3 files
                  without rewriting the stable base dependency manifest.
@@ -33,6 +33,7 @@ VALUES
     (1012,'5000_function/5200_api/5250_api_moc_minifig.sql',ARRAY['api.current_user_owner_id()','api.assert_if_match()','api.inventory_graph_json()','api.replace_inventory_graph()','api.copy_inventory_graph()','api.finalize_inventory_version()','identity.current_user_id()','identity.can_view_owner()','identity.can_manage_owner()','identity.can_view_family_shared_owner()','catalog.items','catalog.mocs','catalog.minifigures','definition.custom_minifigs','definition.inventory_definitions','definition.inventory_versions','definition.minifig_compositions','definition.minifig_structural_components','definition.minifig_accessories','moc.mocs','moc.revisions','moc.forks','moc.subassemblies','moc.licenses','moc.assets','marketplace.market_price_observations']::text[]),
     (1013,'5000_function/5200_api/5260_api_identity_activity.sql',ARRAY['api.assert_if_match()','identity.current_user_id()','identity.users','identity.families','identity.family_memberships','identity.family_member_permissions','identity.owners','operations.notifications','audit.events','collection.entries','marketplace.market_price_observations']::text[]),
     (1014,'5000_function/5200_api/5270_api_market_reporting.sql',ARRAY['identity.current_user_id()','identity.can_view_owner()','catalog.items','catalog.part_variants','marketplace.market_price_observations','reference.external_sources','collection.entries','import.source_runs']::text[]),
+    (104,'5000_function/5700_system/5709_system_request_context.sql',ARRAY['0000_bootstrap/0001_schemas.sql','0100_identity/0100_users.sql','1100_security/1100_roles.sql','audit.events']::text[]),
     (1015,'5000_function/5700_system/5710_system_anonymous_request_context.sql',ARRAY['5000_function/5700_system/5709_system_request_context.sql','brktrkr_api role']::text[]),
     (1016,'5000_function/5200_api/5280_api_admin_finance.sql',ARRAY['admin.assert_system_admin()','admin.set_catalog_item_image()','admin.remove_catalog_item_image()','admin.set_instruction_asset()','admin.remove_instruction_asset()','admin.post_financial_transaction()','identity.current_user_id_optional()','reference.external_sources','catalog.items','catalog.sets','catalog.parts','catalog.minifigures','catalog.mocs','catalog.admin_overrides','import.jobs','import.source_runs','audit.events','audit.changes','finance.transactions','finance.ledger_entries','finance.source_events']::text[]),
     (1021,'5000_function/5100_admin/5131_admin_finance_actor.sql',ARRAY['5000_function/5100_admin/5130_admin_finance.sql','identity.users','finance.accounts','finance.transactions','finance.ledger_entries','pgcrypto']::text[]),
@@ -88,5 +89,5 @@ SELECT pg_temp.bt_preflight(
     ARRAY['0000_bootstrap/0000_dependency_preflight.sql']::text[]
 );
 
-\echo '[PASS] 0006_dependency_preflight_v3.sql v1.3.2'
+\echo '[PASS] 0006_dependency_preflight_v3.sql v1.3.3'
 SELECT pg_temp.bt_mark_completed('0000_bootstrap/0006_dependency_preflight_v3.sql');
