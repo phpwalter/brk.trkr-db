@@ -41,10 +41,10 @@
 \set VERBOSITY verbose
 
 \echo ''
-\echo '==============================================================================='
+\echo '=============================================================================='
 \echo ' LEGO Collection Platform'
 \echo ' PostgreSQL Schema Bootstrap'
-\echo '==============================================================================='
+\echo '=============================================================================='
 \echo ''
 \echo '[BOOTSTRAP] Beginning schema installation...'
 \echo ''
@@ -181,6 +181,7 @@
 \ir 5000_function/5200_api/5260_api_identity_activity.sql
 \ir 5000_function/5200_api/5270_api_market_reporting.sql
 \ir 5000_function/5100_admin/5130_admin_finance.sql
+\ir 5000_function/5100_admin/5131_admin_finance_actor.sql
 \ir 5000_function/5000_importer/5010_importer_rebrickable_reference_reconcile.sql
 \ir 5000_function/5000_importer/5011_importer_rebrickable_catalog_reconcile.sql
 \ir 5000_function/5000_importer/5012_importer_fail_source_run.sql
@@ -192,6 +193,8 @@
 \ir 5000_function/5100_admin/5100_admin_common.sql
 \ir 5000_function/5100_admin/5110_admin_catalog_lifecycle.sql
 \ir 5000_function/5200_api/5280_api_admin_finance.sql
+\ir 5000_function/5200_api/5281_api_admin_finance_actor.sql
+\ir 5000_function/5200_api/5290_api_visibility_reads.sql
 \ir 1200_validation/1210_function_validation.sql
 
 \ir 1100_security/1101_rls_identity.sql
