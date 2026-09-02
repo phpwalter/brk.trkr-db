@@ -1,168 +1,217 @@
 #!/usr/bin/env python3
-"""Verify BrickTrackr dependency declarations, bootstrap coverage, and generated preflights."""
+"""Verify BrickTrackr dependency declarations, bootstrap coverage, and preflight manifests."""
+from __future__ import annotations
+
 from pathlib import Path
-import json, re, sys
+import json
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
+BASE_MANIFEST = ROOT / "DEPENDENCY_MANIFEST.json"
+V3_MANIFEST = ROOT / "DEPENDENCY_MANIFEST_V3.json"
+BASE_HELPER = ROOT / "0000_bootstrap/0000_dependency_preflight.sql"
+V3_HELPER = ROOT / "0000_bootstrap/0006_dependency_preflight_v3.sql"
+
 
 def deps_from_header(text: str):
     end = text.find("*/")
     head = text[:end] if end != -1 else text[:3000]
     m = re.search(
         r"Depends On:\s*(.*?)(?=\n\s*(?:Creates:|Purpose:|Key Rules:|Validation:|Notes:|Seed Data:|===============================================================================))",
-        head, re.S | re.I
+        head,
+        re.S | re.I,
     )
     if not m:
         return None
-    deps=[]
+    deps = []
     for line in m.group(1).splitlines():
-        s=re.sub(r"^\s*\*\s?", "", line).strip()
-        if s:
-            deps.append(s)
+        value = re.sub(r"^\s*\*\s?", "", line).strip()
+        if value:
+            deps.append(value)
     return deps
 
-def main():
-    bootstrap=(ROOT/"bootstrap.sql").read_text()
-    includes=re.findall(r"^\s*\\ir\s+([^\s]+)", bootstrap, re.M)
-    unique=[]
-    for x in includes:
-        if x not in unique:
-            unique.append(x)
 
-    disk=sorted(
-        p.relative_to(ROOT).as_posix()
-        for p in ROOT.rglob("*.sql")
-        if p.name != "bootstrap.sql"
-        and "migrations" not in p.relative_to(ROOT).parts
+def load_manifest(path: Path) -> dict[str, dict]:
+    payload = json.loads(path.read_text())
+    return {entry["file"]: entry for entry in payload["files"]}
+
+
+def parse_helper_rows(text: str) -> dict[str, dict]:
+    rows: dict[str, dict] = {}
+    row_re = re.compile(r"\((\d+),\s*'([^']+)',\s*ARRAY\[(.*?)\]::text\[\]\)", re.S)
+    for match in row_re.finditer(text):
+        values = [
+            value.replace("''", "'")
+            for value in re.findall(r"'((?:''|[^'])*)'", match.group(3))
+        ]
+        rows[match.group(2)] = {
+            "ordinal": int(match.group(1)),
+            "depends_on": values,
+        }
+    return rows
+
+
+def main() -> int:
+    bootstrap = (ROOT / "bootstrap.sql").read_text()
+    includes = re.findall(r"^\s*\\ir\s+([^\s]+)", bootstrap, re.M)
+    unique: list[str] = []
+    for value in includes:
+        if value not in unique:
+            unique.append(value)
+
+    disk = sorted(
+        path.relative_to(ROOT).as_posix()
+        for path in ROOT.rglob("*.sql")
+        if path.name != "bootstrap.sql"
+        and "migrations" not in path.relative_to(ROOT).parts
     )
-    errors=[]
+
+    errors: list[str] = []
     if set(disk) != set(unique):
-        errors.append(f"bootstrap/disk mismatch: missing={sorted(set(disk)-set(unique))}, unknown={sorted(set(unique)-set(disk))}")
+        errors.append(
+            "bootstrap/disk mismatch: "
+            f"missing={sorted(set(disk) - set(unique))}, "
+            f"unknown={sorted(set(unique) - set(disk))}"
+        )
 
-    manifest=json.loads((ROOT/"DEPENDENCY_MANIFEST.json").read_text())
-    mf={x["file"]:x for x in manifest["files"]}
+    base = load_manifest(BASE_MANIFEST)
+    supplement = load_manifest(V3_MANIFEST) if V3_MANIFEST.exists() else {}
+    manifest = dict(base)
+    manifest.update(supplement)
 
-    # The runtime preflight helper embeds its own authoritative manifest. Verify
-    # that generated copy too; otherwise headers/JSON/file preflights can agree
-    # while the installation-time gate is stale.
-    helper_text=(ROOT/"0000_bootstrap/0000_dependency_preflight.sql").read_text()
-    # Bootstrap helper integrity: these temp functions are required before any
-    # subsequent SQL file can execute its generated preflight.
+    if set(manifest) != set(disk):
+        errors.append(
+            "merged manifest/disk mismatch: "
+            f"missing={sorted(set(disk) - set(manifest))}, "
+            f"unknown={sorted(set(manifest) - set(disk))}"
+        )
+
+    helper_text = BASE_HELPER.read_text()
+    supplemental_helper_text = V3_HELPER.read_text() if V3_HELPER.exists() else ""
+
     required_helpers = [
         "CREATE OR REPLACE FUNCTION pg_temp.bt_dependency_exists",
         "CREATE OR REPLACE FUNCTION pg_temp.bt_preflight",
         "CREATE OR REPLACE FUNCTION pg_temp.bt_mark_completed",
     ]
-    helper_positions = {}
-    for signature in required_helpers:
-        pos = helper_text.find(signature)
-        helper_positions[signature] = pos
-        if pos < 0:
-            errors.append(
-                "runtime preflight helper is incomplete: missing " + signature
-            )
-
-    if all(helper_positions[s] >= 0 for s in required_helpers):
+    positions = {signature: helper_text.find(signature) for signature in required_helpers}
+    for signature, position in positions.items():
+        if position < 0:
+            errors.append("runtime preflight helper is incomplete: missing " + signature)
+    if all(positions[signature] >= 0 for signature in required_helpers):
         if not (
-            helper_positions[required_helpers[0]]
-            < helper_positions[required_helpers[1]]
-            < helper_positions[required_helpers[2]]
+            positions[required_helpers[0]]
+            < positions[required_helpers[1]]
+            < positions[required_helpers[2]]
         ):
             errors.append(
                 "runtime preflight helper function order is invalid: "
-                "bt_dependency_exists must precede bt_preflight, which must "
-                "precede bt_mark_completed"
+                "bt_dependency_exists must precede bt_preflight, which must precede bt_mark_completed"
             )
-
-    # bt_preflight must actually invoke bt_dependency_exists; presence alone is
-    # not enough because a generated/helper refactor could orphan the check.
     if "pg_temp.bt_dependency_exists(v_dep)" not in helper_text:
         errors.append(
             "runtime preflight helper is invalid: bt_preflight does not call "
             "pg_temp.bt_dependency_exists(v_dep)"
         )
-    helper_rows={}
-    row_re=re.compile(
-        r"\((\d+),\s*'([^']+)',\s*ARRAY\[(.*?)\]::text\[\]\)",
-        re.S
-    )
-    for hm in row_re.finditer(helper_text):
-        values=[
-            v.replace("''", "'")
-            for v in re.findall(r"'((?:''|[^'])*)'", hm.group(3))
-        ]
-        helper_rows[hm.group(2)]={
-            "ordinal": int(hm.group(1)),
-            "depends_on": values,
-        }
 
-    if set(helper_rows) != set(mf):
-        errors.append(
-            "runtime helper/JSON manifest file-set mismatch: "
-            f"missing={sorted(set(mf)-set(helper_rows))}, "
-            f"unknown={sorted(set(helper_rows)-set(mf))}"
-        )
+    base_rows = parse_helper_rows(helper_text)
+    supplemental_rows = parse_helper_rows(supplemental_helper_text)
+    overridden = set(supplement)
 
-    for rel, entry in mf.items():
-        h=helper_rows.get(rel)
-        if h is None:
+    # Stable base rows must continue to match the stable base JSON manifest.
+    for rel, entry in base.items():
+        if rel in overridden:
             continue
-        if h["ordinal"] != entry["ordinal"]:
+        row = base_rows.get(rel)
+        if row is None:
+            errors.append(f"{rel}: absent from base runtime dependency helper")
+            continue
+        if row["ordinal"] != entry["ordinal"]:
             errors.append(
-                f"{rel}: runtime helper ordinal {h['ordinal']} differs "
-                f"from JSON manifest {entry['ordinal']}"
+                f"{rel}: base runtime helper ordinal {row['ordinal']} differs "
+                f"from base JSON manifest {entry['ordinal']}"
             )
-        if h["depends_on"] != entry["depends_on"]:
-            errors.append(
-                f"{rel}: runtime helper dependencies differ from JSON manifest"
-            )
+        if row["depends_on"] != entry["depends_on"]:
+            errors.append(f"{rel}: base runtime helper dependencies differ from base JSON manifest")
 
-    completed=set()
+    # New supplemental rows must be materialized in the supplemental runtime helper.
+    for rel, entry in supplement.items():
+        if rel in base:
+            # Existing-file overrides are expressed by an UPDATE in the supplement.
+            if rel not in supplemental_helper_text:
+                errors.append(f"{rel}: v3 manifest override is absent from supplemental runtime helper")
+            continue
+        row = supplemental_rows.get(rel)
+        if row is None:
+            errors.append(f"{rel}: absent from v3 supplemental runtime dependency helper")
+            continue
+        if row["ordinal"] != entry["ordinal"]:
+            errors.append(
+                f"{rel}: supplemental helper ordinal {row['ordinal']} differs "
+                f"from v3 JSON manifest {entry['ordinal']}"
+            )
+        if row["depends_on"] != entry["depends_on"]:
+            errors.append(f"{rel}: supplemental runtime helper dependencies differ from v3 JSON manifest")
+
+    completed: set[str] = set()
+    preflight_re = re.compile(
+        r"SELECT pg_temp\.bt_preflight\(\s*'([^']+)'\s*,\s*ARRAY\[(.*?)\]::text\[\]\s*\);",
+        re.S,
+    )
+
     for rel in unique:
-        text=(ROOT/rel).read_text()
-        deps=deps_from_header(text)
+        text = (ROOT / rel).read_text()
+        deps = deps_from_header(text)
         if deps is None:
             errors.append(f"{rel}: missing Depends On header")
-            deps=[]
+            deps = []
 
         if rel != "0000_bootstrap/0000_dependency_preflight.sql":
-            m=re.search(r"SELECT pg_temp\.bt_preflight\('([^']+)', ARRAY\[(.*?)\]::text\[\]\);", text, re.S)
-            if not m:
+            match = preflight_re.search(text)
+            if not match:
                 errors.append(f"{rel}: missing generated preflight call")
             else:
-                values=[v.replace("''","'") for v in re.findall(r"'((?:''|[^'])*)'",m.group(2))]
-                if m.group(1) != rel:
+                values = [
+                    value.replace("''", "'")
+                    for value in re.findall(r"'((?:''|[^'])*)'", match.group(2))
+                ]
+                if match.group(1) != rel:
                     errors.append(f"{rel}: preflight path mismatch")
                 if values != deps:
                     errors.append(f"{rel}: preflight dependencies differ from header")
             if f"bt_mark_completed('{rel}')" not in text:
                 errors.append(f"{rel}: missing completion marker")
 
-        if rel not in mf:
-            errors.append(f"{rel}: absent from DEPENDENCY_MANIFEST.json")
-        elif mf[rel]["depends_on"] != deps:
-            errors.append(f"{rel}: JSON manifest differs from header")
+        entry = manifest.get(rel)
+        if entry is None:
+            errors.append(f"{rel}: absent from merged dependency manifests")
+        elif entry["depends_on"] != deps:
+            errors.append(f"{rel}: merged JSON manifest differs from header")
 
         for dep in deps:
             if dep.endswith(".sql") and dep not in completed:
                 errors.append(f"{rel}: file dependency has not executed yet: {dep}")
-            md=re.match(r"^Complete ([0-9]{4}_[A-Za-z0-9_]+) domain$",dep)
-            if md:
-                prefix=md.group(1)+"/"
-                expected=[r for r in unique if r.startswith(prefix)]
-                missing=[r for r in expected if r not in completed]
+            domain = re.match(r"^Complete ([0-9]{4}_[A-Za-z0-9_]+) domain$", dep)
+            if domain:
+                prefix = domain.group(1) + "/"
+                expected = [candidate for candidate in unique if candidate.startswith(prefix)]
+                missing = [candidate for candidate in expected if candidate not in completed]
                 if missing:
                     errors.append(f"{rel}: domain dependency incomplete: {dep}: {missing}")
         completed.add(rel)
 
     if errors:
         print("DEPENDENCY VERIFICATION FAILED")
-        for e in errors:
-            print("-",e)
+        for error in errors:
+            print("-", error)
         return 1
 
-    print(f"DEPENDENCY VERIFICATION PASSED: {len(unique)} SQL files")
+    print(
+        "DEPENDENCY VERIFICATION PASSED: "
+        f"{len(unique)} SQL files ({len(supplement)} v3 supplemental/override entries)"
+    )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
