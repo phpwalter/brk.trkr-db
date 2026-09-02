@@ -4,21 +4,15 @@
  Project:        LEGO Collection Platform
  Schema Version: 1.3.0
  PostgreSQL:     16+
- Purpose:        Grant the v3 stored-routine API surface to the correct runtime
-                 database capability roles without granting direct business-table
-                 access.
- Depends On:     api.catalog_reference_operation()
-                 api.collection_inventory_operation()
-                 api.wanted_operation()
-                 api.moc_minifig_operation()
-                 api.identity_activity_operation()
-                 api.market_reporting_operation()
+ Purpose:        Add the privileged v3 administrator API grant after the normal
+                 brktrkr_api surface has been reconciled by 1110.
+ Depends On:     1100_security/1110_api_surface_lockdown.sql
                  api.admin_finance_operation()
-                 brktrkr_api role
                  brktrkr_admin role
- Key Rules:      Normal application operations execute as brktrkr_api. Privileged
-                 administration/finance operations execute only as brktrkr_admin.
-                 PUBLIC receives no execute authority.
+ Key Rules:      Normal application execution is governed exclusively by the
+                 canonical runtime allowlist in 1110. Privileged administration
+                 and finance operations are absent from that allowlist and are
+                 executable only by brktrkr_admin. PUBLIC receives no authority.
 ===============================================================================
 */
 
@@ -26,37 +20,34 @@
 SELECT pg_temp.bt_preflight(
     '1100_security/1114_api_v3_execute.sql',
     ARRAY[
-        'api.catalog_reference_operation()',
-        'api.collection_inventory_operation()',
-        'api.wanted_operation()',
-        'api.moc_minifig_operation()',
-        'api.identity_activity_operation()',
-        'api.market_reporting_operation()',
+        '1100_security/1110_api_surface_lockdown.sql',
         'api.admin_finance_operation()',
-        'brktrkr_api role',
         'brktrkr_admin role'
     ]::text[]
 );
 
-REVOKE ALL ON FUNCTION api.catalog_reference_operation(text,jsonb) FROM PUBLIC;
-REVOKE ALL ON FUNCTION api.collection_inventory_operation(text,jsonb,jsonb,text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION api.wanted_operation(text,jsonb,jsonb,text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION api.moc_minifig_operation(text,jsonb,jsonb,text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION api.identity_activity_operation(text,jsonb,jsonb,text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION api.market_reporting_operation(text,jsonb) FROM PUBLIC;
-REVOKE ALL ON FUNCTION api.admin_finance_operation(text,jsonb,jsonb) FROM PUBLIC;
-
-GRANT EXECUTE ON FUNCTION api.catalog_reference_operation(text,jsonb) TO brktrkr_api, brktrkr_admin;
-GRANT EXECUTE ON FUNCTION api.collection_inventory_operation(text,jsonb,jsonb,text) TO brktrkr_api, brktrkr_admin;
-GRANT EXECUTE ON FUNCTION api.wanted_operation(text,jsonb,jsonb,text) TO brktrkr_api, brktrkr_admin;
-GRANT EXECUTE ON FUNCTION api.moc_minifig_operation(text,jsonb,jsonb,text) TO brktrkr_api, brktrkr_admin;
-GRANT EXECUTE ON FUNCTION api.identity_activity_operation(text,jsonb,jsonb,text) TO brktrkr_api, brktrkr_admin;
-GRANT EXECUTE ON FUNCTION api.market_reporting_operation(text,jsonb) TO brktrkr_api, brktrkr_admin;
+REVOKE ALL ON FUNCTION api.admin_finance_operation(text,jsonb,jsonb) FROM PUBLIC, brktrkr_api;
+GRANT USAGE ON SCHEMA api TO brktrkr_admin;
+REVOKE CREATE ON SCHEMA api FROM brktrkr_admin;
 GRANT EXECUTE ON FUNCTION api.admin_finance_operation(text,jsonb,jsonb) TO brktrkr_admin;
 
-GRANT EXECUTE ON FUNCTION api.etag_for_revision(bigint) TO brktrkr_api, brktrkr_admin;
-GRANT EXECUTE ON FUNCTION api.assert_if_match(text,bigint) TO brktrkr_api, brktrkr_admin;
-GRANT EXECUTE ON FUNCTION api.current_user_owner_id() TO brktrkr_api, brktrkr_admin;
+SELECT app.assert_true(
+    has_function_privilege(
+        'brktrkr_admin',
+        'api.admin_finance_operation(text,jsonb,jsonb)',
+        'EXECUTE'
+    ),
+    'brktrkr_admin lacks api.admin_finance_operation execution authority'
+);
+
+SELECT app.assert_true(
+    NOT has_function_privilege(
+        'brktrkr_api',
+        'api.admin_finance_operation(text,jsonb,jsonb)',
+        'EXECUTE'
+    ),
+    'brktrkr_api must not execute privileged administrator operations'
+);
 
 \echo '[PASS] 1114_api_v3_execute.sql'
 SELECT pg_temp.bt_mark_completed('1100_security/1114_api_v3_execute.sql');
