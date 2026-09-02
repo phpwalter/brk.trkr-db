@@ -2,7 +2,7 @@
 ===============================================================================
  File:           1100_security/1110_api_surface_lockdown.sql
  Project:        BrickTrackr
- Schema Version: 1.3.0
+ Schema Version: 1.3.1
  PostgreSQL:     16+
  Purpose:        Make the runtime stored-procedure/API surface explicit,
                  deny-by-default, mechanically reviewable, and safe to rerun.
@@ -28,6 +28,7 @@
                  5000_function/5200_api/5250_api_moc_minifig.sql
                  5000_function/5200_api/5260_api_identity_activity.sql
                  5000_function/5200_api/5270_api_market_reporting.sql
+                 5000_function/5200_api/5290_api_visibility_reads.sql
                  5000_function/5100_admin/5120_admin_definition_graph.sql
                  5000_function/5100_admin/5130_admin_finance.sql
                  5000_function/5000_importer/5000_importer_common.sql
@@ -39,8 +40,11 @@
  Creates:        app.runtime_api_allowlist
  Key Rules:      PUBLIC receives no api.* EXECUTE.
                  brktrkr_api receives EXECUTE only for allowlisted routines.
-                 Privileged api.admin_finance_operation is intentionally absent
-                 and is granted only to brktrkr_admin by 1114.
+                 Privileged administrator dispatchers are intentionally absent
+                 and are granted only to brktrkr_admin by 1114.
+                 Authenticated mutation dispatchers are never classified as
+                 anonymous-safe. Anonymous authored-resource reads use the
+                 dedicated visibility dispatcher.
                  New api.* routines receive no PUBLIC/runtime EXECUTE by default.
                  The allowlist is reconciled idempotently on every run.
 ===============================================================================
@@ -72,6 +76,7 @@ SELECT pg_temp.bt_preflight(
         '5000_function/5200_api/5250_api_moc_minifig.sql',
         '5000_function/5200_api/5260_api_identity_activity.sql',
         '5000_function/5200_api/5270_api_market_reporting.sql',
+        '5000_function/5200_api/5290_api_visibility_reads.sql',
         '5000_function/5100_admin/5120_admin_definition_graph.sql',
         '5000_function/5100_admin/5130_admin_finance.sql',
         '5000_function/5000_importer/5000_importer_common.sql',
@@ -119,9 +124,10 @@ WITH authoritative_allowlist(routine_signature,purpose,anonymous_safe) AS (
         ('api.catalog_reference_operation(text,jsonb)', 'Public/reference catalog dispatcher with operation-level read controls.', true),
         ('api.collection_inventory_operation(text,jsonb,jsonb,text)', 'Authenticated collection, physical inventory and storage lifecycle dispatcher.', false),
         ('api.wanted_operation(text,jsonb,jsonb,text)', 'Authenticated wishlist and build-goal lifecycle dispatcher.', false),
-        ('api.moc_minifig_operation(text,jsonb,jsonb,text)', 'MOC/custom-minifig lifecycle dispatcher with internal visibility enforcement.', true),
+        ('api.moc_minifig_operation(text,jsonb,jsonb,text)', 'Authenticated MOC/custom-minifig mutation lifecycle dispatcher.', false),
         ('api.identity_activity_operation(text,jsonb,jsonb,text)', 'Authenticated profile, family, notification, activity and dashboard dispatcher.', false),
-        ('api.market_reporting_operation(text,jsonb)', 'Market history, authorized valuation and reporting dispatcher.', true)
+        ('api.market_reporting_operation(text,jsonb)', 'Market history, authorized valuation and reporting dispatcher.', true),
+        ('api.visibility_read_operation(text,jsonb)', 'Anonymous-safe and optional-user visibility dispatcher for authored resources and public wishlists.', true)
 )
 INSERT INTO app.runtime_api_allowlist(routine_signature,purpose,anonymous_safe)
 SELECT routine_signature,purpose,anonymous_safe FROM authoritative_allowlist
@@ -156,7 +162,8 @@ WITH authoritative(routine_signature) AS (
         ('api.wanted_operation(text,jsonb,jsonb,text)'),
         ('api.moc_minifig_operation(text,jsonb,jsonb,text)'),
         ('api.identity_activity_operation(text,jsonb,jsonb,text)'),
-        ('api.market_reporting_operation(text,jsonb)')
+        ('api.market_reporting_operation(text,jsonb)'),
+        ('api.visibility_read_operation(text,jsonb)')
 )
 DELETE FROM app.runtime_api_allowlist existing
 WHERE NOT EXISTS (SELECT 1 FROM authoritative a WHERE a.routine_signature=existing.routine_signature);
@@ -192,8 +199,8 @@ DECLARE
     v_count integer;
 BEGIN
     SELECT count(*) INTO v_count FROM app.runtime_api_allowlist;
-    IF v_count<>27 THEN
-        RAISE EXCEPTION 'Runtime API allowlist cardinality mismatch: expected 27, found %.',v_count;
+    IF v_count<>28 THEN
+        RAISE EXCEPTION 'Runtime API allowlist cardinality mismatch: expected 28, found %.',v_count;
     END IF;
 
     FOR v_signature IN SELECT routine_signature FROM app.runtime_api_allowlist ORDER BY routine_signature LOOP
@@ -213,5 +220,5 @@ BEGIN
 END
 $verify_api_surface$;
 
-\echo '[PASS] 1110_api_surface_lockdown.sql v1.3.0'
+\echo '[PASS] 1110_api_surface_lockdown.sql v1.3.1'
 SELECT pg_temp.bt_mark_completed('1100_security/1110_api_surface_lockdown.sql');
